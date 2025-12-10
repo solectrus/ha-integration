@@ -1,101 +1,119 @@
-"""Sample API Client."""
+"""InfluxDB access layer for the SOLECTRUS integration."""
 
 from __future__ import annotations
 
-import socket
+import asyncio
+import ssl
 from typing import Any
 
-import aiohttp
-import async_timeout
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
+
+from .const import LOGGER
 
 
-class IntegrationBlueprintApiClientError(Exception):
-    """Exception to indicate a general API error."""
+class SolectrusInfluxError(Exception):
+    """Base exception for InfluxDB write issues."""
 
 
-class IntegrationBlueprintApiClientCommunicationError(
-    IntegrationBlueprintApiClientError,
-):
-    """Exception to indicate a communication error."""
+class SolectrusInfluxClient:
+    """Thin wrapper around the sync InfluxDB client, executed off the event loop."""
 
+    def __init__(self, url: str, token: str, org: str, bucket: str) -> None:
+        """Create the Influx client wrapper."""
+        self._url = url
+        self._token = token
+        self._org = org
+        self._bucket = bucket
+        self._client: InfluxDBClient | None = None
+        self._write_api: WriteApi | None = None
+        self._ssl = not url.lower().startswith("http://")
 
-class IntegrationBlueprintApiClientAuthenticationError(
-    IntegrationBlueprintApiClientError,
-):
-    """Exception to indicate an authentication error."""
-
-
-def _verify_response_or_raise(response: aiohttp.ClientResponse) -> None:
-    """Verify that the response is valid."""
-    if response.status in (401, 403):
-        msg = "Invalid credentials"
-        raise IntegrationBlueprintApiClientAuthenticationError(
-            msg,
-        )
-    response.raise_for_status()
-
-
-class IntegrationBlueprintApiClient:
-    """Sample API Client."""
-
-    def __init__(
-        self,
-        username: str,
-        password: str,
-        session: aiohttp.ClientSession,
-    ) -> None:
-        """Sample API Client."""
-        self._username = username
-        self._password = password
-        self._session = session
-
-    async def async_get_data(self) -> Any:
-        """Get data from the API."""
-        return await self._api_wrapper(
-            method="get",
-            url="https://jsonplaceholder.typicode.com/posts/1",
-        )
-
-    async def async_set_title(self, value: str) -> Any:
-        """Get data from the API."""
-        return await self._api_wrapper(
-            method="patch",
-            url="https://jsonplaceholder.typicode.com/posts/1",
-            data={"title": value},
-            headers={"Content-type": "application/json; charset=UTF-8"},
-        )
-
-    async def _api_wrapper(
-        self,
-        method: str,
-        url: str,
-        data: dict | None = None,
-        headers: dict | None = None,
-    ) -> Any:
-        """Get information from the API."""
+    async def async_validate_connection(self) -> None:
+        """Validate connectivity, auth, and bucket access."""
+        client = await self._ensure_client()
+        loop = asyncio.get_running_loop()
         try:
-            async with async_timeout.timeout(10):
-                response = await self._session.request(
-                    method=method,
-                    url=url,
-                    headers=headers,
-                    json=data,
-                )
-                _verify_response_or_raise(response)
-                return await response.json()
+            bucket = await loop.run_in_executor(
+                None, lambda: client.buckets_api().find_bucket_by_name(self._bucket)
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            message = f"Bucket lookup failed: {err}"
+            raise SolectrusInfluxError(message) from err
 
-        except TimeoutError as exception:
-            msg = f"Timeout error fetching information - {exception}"
-            raise IntegrationBlueprintApiClientCommunicationError(
-                msg,
-            ) from exception
-        except (aiohttp.ClientError, socket.gaierror) as exception:
-            msg = f"Error fetching information - {exception}"
-            raise IntegrationBlueprintApiClientCommunicationError(
-                msg,
-            ) from exception
-        except Exception as exception:  # pylint: disable=broad-except
-            msg = f"Something really wrong happened! - {exception}"
-            raise IntegrationBlueprintApiClientError(
-                msg,
-            ) from exception
+        if bucket is None:
+            message = "Bucket not found or token lacks permission to read it"
+            raise SolectrusInfluxError(message)
+
+    async def async_connect(self) -> None:
+        """Prepare the write API."""
+        client = await self._ensure_client()
+        if self._write_api is None:
+            loop = asyncio.get_running_loop()
+            self._write_api = await loop.run_in_executor(
+                None, lambda: client.write_api(write_options=SYNCHRONOUS)
+            )
+
+    async def async_write(
+        self,
+        measurement: str,
+        field: str,
+        value: Any,
+    ) -> None:
+        """Write a point to InfluxDB."""
+        if self._write_api is None:
+            await self.async_connect()
+
+        point = Point(measurement)
+        point.field(field, value)
+
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self._write_api.write(
+                    bucket=self._bucket,
+                    org=self._org,
+                    record=point,
+                    write_precision=WritePrecision.S,
+                ),
+            )
+        except Exception as err:  # pylint: disable=broad-except
+            LOGGER.error("Failed to write point to InfluxDB: %s", err)
+            raise SolectrusInfluxError(err) from err
+
+    async def async_close(self) -> None:
+        """Close the client."""
+        client = self._client
+        self._client = None
+        self._write_api = None
+        if client is None:
+            return
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, client.close)
+
+    async def _ensure_client(self) -> InfluxDBClient:
+        """Create the client off the event loop to avoid blocking."""
+        if self._client is not None:
+            return self._client
+
+        loop = asyncio.get_running_loop()
+
+        def _build_client() -> InfluxDBClient:
+            ssl_param: bool | ssl.SSLContext = (
+                ssl.create_default_context() if self._ssl else False
+            )
+            return InfluxDBClient(
+                url=self._url,
+                token=self._token,
+                org=self._org,
+                ssl=ssl_param,
+                verify_ssl=self._ssl,
+            )
+
+        try:
+            self._client = await loop.run_in_executor(None, _build_client)
+        except Exception as err:  # pylint: disable=broad-except
+            message = f"Failed to create InfluxDB client: {err}"
+            raise SolectrusInfluxError(message) from err
+        return self._client

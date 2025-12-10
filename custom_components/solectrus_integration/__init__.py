@@ -1,78 +1,95 @@
-"""
-Custom integration to integrate solectrus_integration with Home Assistant.
-
-For more details about this integration, please refer to
-https://github.com/solectrus/ha-integration
-"""
+"""SOLECTRUS integration entry point."""
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.loader import async_get_loaded_integration
-
-from .api import IntegrationBlueprintApiClient
-from .const import DOMAIN, LOGGER
-from .coordinator import BlueprintDataUpdateCoordinator
-from .data import IntegrationBlueprintData
+from .api import SolectrusInfluxClient
+from .const import (
+    CONF_BUCKET,
+    CONF_ENTITY_ID,
+    CONF_FIELD,
+    CONF_MEASUREMENT,
+    CONF_ORG,
+    CONF_SENSORS,
+    CONF_TOKEN,
+    CONF_URL,
+    SENSOR_DEFINITIONS,
+)
+from .data import SolectrusConfigEntry, SolectrusRuntimeData
+from .manager import ConfiguredSensor, SensorManager
 
 if TYPE_CHECKING:
+    from homeassistant.const import Platform
     from homeassistant.core import HomeAssistant
 
-    from .data import IntegrationBlueprintConfigEntry
-
-PLATFORMS: list[Platform] = [
-    Platform.SENSOR,
-    Platform.BINARY_SENSOR,
-    Platform.SWITCH,
-]
+PLATFORMS: list[Platform] = []
 
 
-# https://developers.home-assistant.io/docs/config_entries_index/#setting-up-an-entry
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: IntegrationBlueprintConfigEntry,
+    entry: SolectrusConfigEntry,
 ) -> bool:
-    """Set up this integration using UI."""
-    coordinator = BlueprintDataUpdateCoordinator(
-        hass=hass,
-        logger=LOGGER,
-        name=DOMAIN,
-        update_interval=timedelta(hours=1),
-    )
-    entry.runtime_data = IntegrationBlueprintData(
-        client=IntegrationBlueprintApiClient(
-            username=entry.data[CONF_USERNAME],
-            password=entry.data[CONF_PASSWORD],
-            session=async_get_clientsession(hass),
-        ),
-        integration=async_get_loaded_integration(hass, entry.domain),
-        coordinator=coordinator,
+    """Set up the SOLECTRUS integration."""
+    client = SolectrusInfluxClient(
+        url=entry.data[CONF_URL],
+        token=entry.data[CONF_TOKEN],
+        org=entry.data[CONF_ORG],
+        bucket=entry.data[CONF_BUCKET],
     )
 
-    # https://developers.home-assistant.io/docs/integration_fetching_data#coordinated-single-api-poll-for-data-for-all-entities
-    await coordinator.async_config_entry_first_refresh()
+    sensors = _build_sensor_map(entry)
+    manager = SensorManager(hass, client, sensors)
+    await manager.async_start()
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.runtime_data = SolectrusRuntimeData(
+        client=client,
+        manager=manager,
+    )
+
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-
     return True
 
 
 async def async_unload_entry(
-    hass: HomeAssistant,
-    entry: IntegrationBlueprintConfigEntry,
+    _hass: HomeAssistant,
+    entry: SolectrusConfigEntry,
 ) -> bool:
     """Handle removal of an entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    runtime = entry.runtime_data
+    await runtime.manager.async_stop()
+    await runtime.client.async_close()
+    return True
 
 
 async def async_reload_entry(
     hass: HomeAssistant,
-    entry: IntegrationBlueprintConfigEntry,
+    entry: SolectrusConfigEntry,
 ) -> None:
     """Reload config entry."""
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor]:
+    """Create ConfiguredSensor objects keyed by entity_id."""
+    sensors: dict[str, ConfiguredSensor] = {}
+    configured_sensors: dict = entry.options.get(CONF_SENSORS, {})
+
+    for key, settings in configured_sensors.items():
+        entity_id = settings.get(CONF_ENTITY_ID)
+        if not entity_id:
+            continue
+
+        defaults = SENSOR_DEFINITIONS.get(key)
+        measurement = settings.get(
+            CONF_MEASUREMENT, defaults.measurement if defaults else key.lower()
+        )
+        field = settings.get(CONF_FIELD, defaults.field if defaults else "value")
+        sensors[entity_id] = ConfiguredSensor(
+            key=key,
+            entity_id=entity_id,
+            measurement=measurement,
+            field=field,
+        )
+
+    return sensors
