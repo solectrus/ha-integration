@@ -1,0 +1,10 @@
+{
+  "domain": "solectrus_integration",
+  "name": "SOLECTRUS",
+  "codeowners": ["@solectrus"],
+  "config_flow": true,
+  "documentation": "https://github.com/solectrus/ha-integration",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/solectrus/ha-integration/issues",
+  "version": "0.1.0"
+}
