@@ -1,0 +1,196 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Connect Home Assistant to your SOLECTRUS instance.",
+        "data": {
+          "url": "InfluxDB URL",
+          "token": "API token",
+          "org": "Organization",
+          "bucket": "Bucket"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Connection test to InfluxDB failed: {error}. Please verify URL, token, org, and bucket.",
+      "unknown": "Unexpected error during setup. Please check the logs for details."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Map SOLECTRUS sensors to Home Assistant entities. Measurement and field are optional; defaults are pre-filled.",
+        "data": {
+          "advanced": "Manually set custom measurement/field names"
+        }
+      },
+      "sensors": {
+        "data": {
+          "INVERTER_POWER_entity": "Inverter power (current production)",
+          "INVERTER_POWER_measurement": "Measurement name for inverter power (optional)",
+          "INVERTER_POWER_field": "Field name for inverter power (optional)",
+
+          "INVERTER_POWER_1_entity": "Inverter 1 power",
+          "INVERTER_POWER_1_measurement": "Measurement name for inverter 1 power (optional)",
+          "INVERTER_POWER_1_field": "Field name for inverter 1 power (optional)",
+
+          "INVERTER_POWER_2_entity": "Inverter 2 power",
+          "INVERTER_POWER_2_measurement": "Measurement name for inverter 2 power (optional)",
+          "INVERTER_POWER_2_field": "Field name for inverter 2 power (optional)",
+
+          "INVERTER_POWER_3_entity": "Inverter 3 power",
+          "INVERTER_POWER_3_measurement": "Measurement name for inverter 3 power (optional)",
+          "INVERTER_POWER_3_field": "Field name for inverter 3 power (optional)",
+
+          "INVERTER_POWER_4_entity": "Inverter 4 power",
+          "INVERTER_POWER_4_measurement": "Measurement name for inverter 4 power (optional)",
+          "INVERTER_POWER_4_field": "Field name for inverter 4 power (optional)",
+
+          "INVERTER_POWER_5_entity": "Inverter 5 power",
+          "INVERTER_POWER_5_measurement": "Measurement name for inverter 5 power (optional)",
+          "INVERTER_POWER_5_field": "Field name for inverter 5 power (optional)",
+
+          "HOUSE_POWER_entity": "House power (consumption)",
+          "HOUSE_POWER_measurement": "Measurement name for house power (optional)",
+          "HOUSE_POWER_field": "Field name for house power (optional)",
+
+          "BATTERY_SOC_entity": "Battery state of charge",
+          "BATTERY_SOC_measurement": "Measurement name for battery state of charge (optional)",
+          "BATTERY_SOC_field": "Field name for battery state of charge (optional)",
+
+          "BATTERY_CHARGING_POWER_entity": "Battery charging power",
+          "BATTERY_CHARGING_POWER_measurement": "Measurement name for battery charging power (optional)",
+          "BATTERY_CHARGING_POWER_field": "Field name for battery charging power (optional)",
+
+          "BATTERY_DISCHARGING_POWER_entity": "Battery discharging power",
+          "BATTERY_DISCHARGING_POWER_measurement": "Measurement name for battery discharging power (optional)",
+          "BATTERY_DISCHARGING_POWER_field": "Field name for battery discharging power (optional)",
+
+          "HEATPUMP_POWER_entity": "Heat pump power",
+          "HEATPUMP_POWER_measurement": "Measurement name for heat pump power (optional)",
+          "HEATPUMP_POWER_field": "Field name for heat pump power (optional)",
+
+          "HEATPUMP_TANK_TEMP_entity": "Heat pump tank temperature",
+          "HEATPUMP_TANK_TEMP_measurement": "Measurement name for heat pump tank temperature (optional)",
+          "HEATPUMP_TANK_TEMP_field": "Field name for heat pump tank temperature (optional)",
+
+          "OUTDOOR_TEMP_FORECAST_entity": "Outdoor temperature forecast",
+          "OUTDOOR_TEMP_FORECAST_measurement": "Measurement name for outdoor temperature forecast (optional)",
+          "OUTDOOR_TEMP_FORECAST_field": "Field name for outdoor temperature forecast (optional)",
+
+          "GRID_POWER_EXPORT_entity": "Grid export power",
+          "GRID_POWER_EXPORT_measurement": "Measurement name for grid export power (optional)",
+          "GRID_POWER_EXPORT_field": "Field name for grid export power (optional)",
+
+          "GRID_POWER_IMPORT_entity": "Grid import power",
+          "GRID_POWER_IMPORT_measurement": "Measurement name for grid import power (optional)",
+          "GRID_POWER_IMPORT_field": "Field name for grid import power (optional)",
+
+          "WALLBOX_POWER_entity": "Wallbox/EVSE power",
+          "WALLBOX_POWER_measurement": "Measurement name for wallbox/EVSE power (optional)",
+          "WALLBOX_POWER_field": "Field name for wallbox/EVSE power (optional)",
+
+          "CASE_TEMP_entity": "Case temperature",
+          "CASE_TEMP_measurement": "Measurement name for case temperature (optional)",
+          "CASE_TEMP_field": "Field name for case temperature (optional)",
+
+          "CAR_BATTERY_SOC_entity": "Car battery state of charge",
+          "CAR_BATTERY_SOC_measurement": "Measurement name for car battery state of charge (optional)",
+          "CAR_BATTERY_SOC_field": "Field name for car battery state of charge (optional)",
+
+          "CAR_MILEAGE_entity": "Car mileage",
+          "CAR_MILEAGE_measurement": "Measurement name for car mileage (optional)",
+          "CAR_MILEAGE_field": "Field name for car mileage (optional)",
+
+          "OUTDOOR_TEMP_entity": "Outdoor temperature",
+          "OUTDOOR_TEMP_measurement": "Measurement name for outdoor temperature (optional)",
+          "OUTDOOR_TEMP_field": "Field name for outdoor temperature (optional)",
+
+          "SYSTEM_STATUS_entity": "System status",
+          "SYSTEM_STATUS_measurement": "Measurement name for system status (optional)",
+          "SYSTEM_STATUS_field": "Field name for system status (optional)",
+
+          "CUSTOM_01_entity": "Custom 01",
+          "CUSTOM_01_measurement": "Measurement name for custom 01 (optional)",
+          "CUSTOM_01_field": "Field name for custom 01 (optional)",
+
+          "CUSTOM_02_entity": "Custom 02",
+          "CUSTOM_02_measurement": "Measurement name for custom 02 (optional)",
+          "CUSTOM_02_field": "Field name for custom 02 (optional)",
+
+          "CUSTOM_03_entity": "Custom 03",
+          "CUSTOM_03_measurement": "Measurement name for custom 03 (optional)",
+          "CUSTOM_03_field": "Field name for custom 03 (optional)",
+
+          "CUSTOM_04_entity": "Custom 04",
+          "CUSTOM_04_measurement": "Measurement name for custom 04 (optional)",
+          "CUSTOM_04_field": "Field name for custom 04 (optional)",
+
+          "CUSTOM_05_entity": "Custom 05",
+          "CUSTOM_05_measurement": "Measurement name for custom 05 (optional)",
+          "CUSTOM_05_field": "Field name for custom 05 (optional)",
+
+          "CUSTOM_06_entity": "Custom 06",
+          "CUSTOM_06_measurement": "Measurement name for custom 06 (optional)",
+          "CUSTOM_06_field": "Field name for custom 06 (optional)",
+
+          "CUSTOM_07_entity": "Custom 07",
+          "CUSTOM_07_measurement": "Measurement name for custom 07 (optional)",
+          "CUSTOM_07_field": "Field name for custom 07 (optional)",
+
+          "CUSTOM_08_entity": "Custom 08",
+          "CUSTOM_08_measurement": "Measurement name for custom 08 (optional)",
+          "CUSTOM_08_field": "Field name for custom 08 (optional)",
+
+          "CUSTOM_09_entity": "Custom 09",
+          "CUSTOM_09_measurement": "Measurement name for custom 09 (optional)",
+          "CUSTOM_09_field": "Field name for custom 09 (optional)",
+
+          "CUSTOM_10_entity": "Custom 10",
+          "CUSTOM_10_measurement": "Measurement name for custom 10 (optional)",
+          "CUSTOM_10_field": "Field name for custom 10 (optional)",
+
+          "CUSTOM_11_entity": "Custom 11",
+          "CUSTOM_11_measurement": "Measurement name for custom 11 (optional)",
+          "CUSTOM_11_field": "Field name for custom 11 (optional)",
+
+          "CUSTOM_12_entity": "Custom 12",
+          "CUSTOM_12_measurement": "Measurement name for custom 12 (optional)",
+          "CUSTOM_12_field": "Field name for custom 12 (optional)",
+
+          "CUSTOM_13_entity": "Custom 13",
+          "CUSTOM_13_measurement": "Measurement name for custom 13 (optional)",
+          "CUSTOM_13_field": "Field name for custom 13 (optional)",
+
+          "CUSTOM_14_entity": "Custom 14",
+          "CUSTOM_14_measurement": "Measurement name for custom 14 (optional)",
+          "CUSTOM_14_field": "Field name for custom 14 (optional)",
+
+          "CUSTOM_15_entity": "Custom 15",
+          "CUSTOM_15_measurement": "Measurement name for custom 15 (optional)",
+          "CUSTOM_15_field": "Field name for custom 15 (optional)",
+
+          "CUSTOM_16_entity": "Custom 16",
+          "CUSTOM_16_measurement": "Measurement name for custom 16 (optional)",
+          "CUSTOM_16_field": "Field name for custom 16 (optional)",
+
+          "CUSTOM_17_entity": "Custom 17",
+          "CUSTOM_17_measurement": "Measurement name for custom 17 (optional)",
+          "CUSTOM_17_field": "Field name for custom 17 (optional)",
+
+          "CUSTOM_18_entity": "Custom 18",
+          "CUSTOM_18_measurement": "Measurement name for custom 18 (optional)",
+          "CUSTOM_18_field": "Field name for custom 18 (optional)",
+
+          "CUSTOM_19_entity": "Custom 19",
+          "CUSTOM_19_measurement": "Measurement name for custom 19 (optional)",
+          "CUSTOM_19_field": "Field name for custom 19 (optional)",
+
+          "CUSTOM_20_entity": "Custom 20",
+          "CUSTOM_20_measurement": "Measurement name for custom 20 (optional)",
+          "CUSTOM_20_field": "Field name for custom 20 (optional)"
+        }
+      }
+    }
+  }
+}

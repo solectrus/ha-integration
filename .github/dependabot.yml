@@ -1,20 +1,22 @@
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
-  - package-ecosystem: "devcontainers"
-    directory: "/"
+  - package-ecosystem: 'devcontainers'
+    directory: '/'
     schedule:
-      interval: "daily"
+      interval: 'daily'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "daily"
+      interval: 'daily'
 
-  - package-ecosystem: "pip"
-    directory: "/"
+  - package-ecosystem: 'pip'
+    directory: '/'
     schedule:
-      interval: "daily"
+      interval: 'daily'
+    # Security updates are disabled because Home Assistant is pinned to the
+    # version declared in hacs.json and we deliberately ignore it below.
     ignore:
       # Dependabot should not update Home Assistant as that should match the homeassistant key in hacs.json
-      - dependency-name: "homeassistant"
+      - dependency-name: 'homeassistant'
