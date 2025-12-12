@@ -19,6 +19,28 @@ from .api import SolectrusInfluxClient, SolectrusInfluxError
 MIN_WRITE_GAP = timedelta(seconds=5)
 MAX_WRITE_GAP = timedelta(minutes=5)
 
+BOOL_STRING_MAP: dict[str, bool] = {
+    "on": True,
+    "true": True,
+    "1": True,
+    "yes": True,
+    "off": False,
+    "false": False,
+    "0": False,
+    "no": False,
+}
+
+
+def _coerce_int(value: Any) -> int:
+    return int(float(value))
+
+
+SIMPLE_CONVERTERS: dict[str, Any] = {
+    "int": _coerce_int,
+    "float": float,
+    "string": str,
+}
+
 
 @dataclass
 class ConfiguredSensor:
@@ -28,6 +50,7 @@ class ConfiguredSensor:
     entity_id: str
     measurement: str
     field: str
+    data_type: str
     last_value: Any | None = None
     last_sent_at: datetime | None = None
 
@@ -128,6 +151,9 @@ class SensorManager:
         timestamp: datetime,
     ) -> None:
         """Write a value to InfluxDB."""
+        value = self._coerce_value(value, sensor.data_type)
+        if value is None:
+            return
         try:
             await self._client.async_write(
                 measurement=sensor.measurement,
@@ -138,6 +164,30 @@ class SensorManager:
         except SolectrusInfluxError:
             # Error already logged inside the client.
             return
+
+    @staticmethod
+    def _coerce_value(value: Any, data_type: str) -> Any | None:
+        """Coerce value to the configured datatype."""
+        try:
+            if data_type in SIMPLE_CONVERTERS:
+                coerced: Any | None = SIMPLE_CONVERTERS[data_type](value)
+            elif data_type == "bool":
+                if isinstance(value, bool):
+                    coerced = value
+                elif isinstance(value, (int, float)):
+                    coerced = bool(value)
+                else:
+                    coerced = (
+                        BOOL_STRING_MAP.get(value.lower())
+                        if isinstance(value, str)
+                        else None
+                    )
+            else:
+                coerced = value
+        except (TypeError, ValueError):
+            return None
+
+        return coerced
 
     @staticmethod
     def _state_to_value(state: State | None) -> Any | None:

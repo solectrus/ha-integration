@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from .api import SolectrusInfluxClient
 from .const import (
     CONF_BUCKET,
+    CONF_DATA_TYPE,
     CONF_ENTITY_ID,
     CONF_FIELD,
     CONF_MEASUREMENT,
@@ -85,11 +86,15 @@ def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor
             CONF_MEASUREMENT, defaults.measurement if defaults else key.lower()
         )
         field = settings.get(CONF_FIELD, defaults.field if defaults else "value")
+        data_type = settings.get(
+            CONF_DATA_TYPE, defaults.data_type if defaults else "float"
+        )
         sensors[entity_id] = ConfiguredSensor(
             key=key,
             entity_id=entity_id,
             measurement=measurement,
             field=field,
+            data_type=data_type,
         )
 
     return sensors

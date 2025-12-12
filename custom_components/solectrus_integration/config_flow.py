@@ -10,6 +10,7 @@ from homeassistant.helpers import selector
 from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import (
     CONF_BUCKET,
+    CONF_DATA_TYPE,
     CONF_ENTITY_ID,
     CONF_FIELD,
     CONF_MEASUREMENT,
@@ -17,6 +18,7 @@ from .const import (
     CONF_SENSORS,
     CONF_TOKEN,
     CONF_URL,
+    DATA_TYPE_OPTIONS,
     DOMAIN,
     LOGGER,
     SENSOR_DEFINITIONS,
@@ -158,14 +160,17 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                 entity_id = user_input.get(f"{key}_entity")
                 measurement = configured.get(CONF_MEASUREMENT, definition.measurement)
                 field = configured.get(CONF_FIELD, definition.field)
+                data_type = configured.get(CONF_DATA_TYPE, definition.data_type)
                 if self._show_advanced:
                     measurement = user_input.get(f"{key}_measurement") or measurement
                     field = user_input.get(f"{key}_field") or field
+                    data_type = user_input.get(f"{key}_data_type") or data_type
                 if entity_id:
                     sensors[key] = {
                         CONF_ENTITY_ID: entity_id,
                         CONF_MEASUREMENT: measurement,
                         CONF_FIELD: field,
+                        CONF_DATA_TYPE: data_type,
                     }
 
             return self.async_create_entry(
@@ -207,6 +212,17 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                 ] = selector.TextSelector(
                     selector.TextSelectorConfig(
                         type=selector.TextSelectorType.TEXT,
+                    )
+                )
+                schema_dict[
+                    vol.Optional(
+                        f"{key}_data_type",
+                        default=configured.get(CONF_DATA_TYPE, definition.data_type),
+                    )
+                ] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=DATA_TYPE_OPTIONS,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 )
 

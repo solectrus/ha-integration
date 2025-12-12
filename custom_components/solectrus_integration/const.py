@@ -18,40 +18,61 @@ CONF_SENSORS: Final = "sensors"
 CONF_ENTITY_ID: Final = "entity_id"
 CONF_MEASUREMENT: Final = "measurement"
 CONF_FIELD: Final = "field"
+CONF_DATA_TYPE: Final = "data_type"
+DATA_TYPE_INT: Final = "int"
+DATA_TYPE_FLOAT: Final = "float"
+DATA_TYPE_BOOL: Final = "bool"
+DATA_TYPE_STRING: Final = "string"
+
+DATA_TYPE_OPTIONS: Final = [
+    DATA_TYPE_INT,
+    DATA_TYPE_FLOAT,
+    DATA_TYPE_BOOL,
+    DATA_TYPE_STRING,
+]
 
 
 @dataclass(frozen=True)
 class SensorDefinition:
-    """Default measurement/field for a SOLECTRUS sensor."""
+    """Default mapping and datatype for a SOLECTRUS sensor."""
 
     measurement: str
     field: str
+    data_type: str
 
 
 SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
-    "INVERTER_POWER": SensorDefinition("inverter", "power"),
-    "INVERTER_POWER_1": SensorDefinition("inverter_1", "power"),
-    "INVERTER_POWER_2": SensorDefinition("inverter_2", "power"),
-    "INVERTER_POWER_3": SensorDefinition("inverter_3", "power"),
-    "INVERTER_POWER_4": SensorDefinition("inverter_4", "power"),
-    "INVERTER_POWER_5": SensorDefinition("inverter_5", "power"),
-    "HOUSE_POWER": SensorDefinition("house", "power"),
-    "BATTERY_SOC": SensorDefinition("battery", "soc"),
-    "BATTERY_CHARGING_POWER": SensorDefinition("battery", "charging_power"),
-    "BATTERY_DISCHARGING_POWER": SensorDefinition("battery", "discharging_power"),
-    "HEATPUMP_POWER": SensorDefinition("heatpump", "power"),
-    "HEATPUMP_TANK_TEMP": SensorDefinition("heatpump", "tank_temp"),
-    "OUTDOOR_TEMP_FORECAST": SensorDefinition("outdoor_forecast", "temperature"),
-    "GRID_POWER_EXPORT": SensorDefinition("grid", "export_power"),
-    "GRID_POWER_IMPORT": SensorDefinition("grid", "import_power"),
-    "WALLBOX_POWER": SensorDefinition("wallbox", "power"),
-    "CASE_TEMP": SensorDefinition("case", "temperature"),
-    "CAR_BATTERY_SOC": SensorDefinition("car", "battery_soc"),
-    "CAR_MILEAGE": SensorDefinition("car", "mileage"),
-    "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature"),
-    "SYSTEM_STATUS": SensorDefinition("system", "status"),
+    "INVERTER_POWER": SensorDefinition("inverter", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_1": SensorDefinition("inverter_1", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_2": SensorDefinition("inverter_2", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_3": SensorDefinition("inverter_3", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_4": SensorDefinition("inverter_4", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_5": SensorDefinition("inverter_5", "power", DATA_TYPE_INT),
+    "HOUSE_POWER": SensorDefinition("house", "power", DATA_TYPE_INT),
+    "BATTERY_SOC": SensorDefinition("battery", "soc", DATA_TYPE_FLOAT),
+    "BATTERY_CHARGING_POWER": SensorDefinition(
+        "battery", "charging_power", DATA_TYPE_INT
+    ),
+    "BATTERY_DISCHARGING_POWER": SensorDefinition(
+        "battery", "discharging_power", DATA_TYPE_INT
+    ),
+    "HEATPUMP_POWER": SensorDefinition("heatpump", "power", DATA_TYPE_INT),
+    "HEATPUMP_TANK_TEMP": SensorDefinition("heatpump", "tank_temp", DATA_TYPE_FLOAT),
+    "OUTDOOR_TEMP_FORECAST": SensorDefinition(
+        "outdoor_forecast", "temperature", DATA_TYPE_FLOAT
+    ),
+    "GRID_POWER_EXPORT": SensorDefinition("grid", "export_power", DATA_TYPE_INT),
+    "GRID_POWER_IMPORT": SensorDefinition("grid", "import_power", DATA_TYPE_INT),
+    "WALLBOX_POWER": SensorDefinition("wallbox", "power", DATA_TYPE_INT),
+    "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
+    "CAR_BATTERY_SOC": SensorDefinition("car", "battery_soc", DATA_TYPE_FLOAT),
+    "CAR_MILEAGE": SensorDefinition("car", "mileage", DATA_TYPE_INT),
+    "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
+    "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
 }
 
 for index in range(1, 21):
     key = f"CUSTOM_{index:02d}"
-    SENSOR_DEFINITIONS[key] = SensorDefinition(f"custom_{index:02d}", "power")
+    SENSOR_DEFINITIONS[key] = SensorDefinition(
+        f"custom_{index:02d}", "power", DATA_TYPE_INT
+    )
