@@ -21,7 +21,17 @@
       "init": {
         "description": "Map SOLECTRUS sensors to Home Assistant entities. Measurement and field are optional; defaults are pre-filled.",
         "data": {
-          "advanced": "Show advanced options (measurement, field, data type)"
+          "advanced": "Show advanced options (measurement, field, data type)",
+          "edit_influx": "Edit InfluxDB connection settings"
+        }
+      },
+      "influx": {
+        "description": "Update the InfluxDB connection details used by SOLECTRUS.",
+        "data": {
+          "url": "InfluxDB URL",
+          "token": "API token",
+          "org": "Organization",
+          "bucket": "Bucket"
         }
       },
       "sensors": {

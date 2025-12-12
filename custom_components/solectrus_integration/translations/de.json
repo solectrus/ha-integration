@@ -21,7 +21,17 @@
       "init": {
         "description": "Ordne SOLECTRUS-Sensoren Home-Assistant-Sensoren zu. Measurement und Feld sind optional; Standardwerte sind vorbelegt.",
         "data": {
-          "advanced": "Erweiterte Optionen anzeigen (Measurement, Feld, Datentyp)"
+          "advanced": "Erweiterte Optionen anzeigen (Measurement, Feld, Datentyp)",
+          "edit_influx": "InfluxDB-Verbindungsdaten bearbeiten"
+        }
+      },
+      "influx": {
+        "description": "Aktualisiere die für SOLECTRUS verwendeten InfluxDB-Verbindungsdaten.",
+        "data": {
+          "url": "InfluxDB-URL",
+          "token": "API-Token",
+          "org": "Organisation",
+          "bucket": "Bucket"
         }
       },
       "sensors": {

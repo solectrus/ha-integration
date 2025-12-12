@@ -131,9 +131,11 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Decide whether to show advanced fields."""
+        """Decide whether to edit Influx settings or sensors."""
         if user_input is not None:
             self._show_advanced = user_input.get("advanced", False)
+            if user_input.get("edit_influx", False):
+                return await self.async_step_influx()
             return await self.async_step_sensors()
 
         return self.async_show_form(
@@ -143,9 +145,91 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required(
                         "advanced",
                         default=self._show_advanced,
-                    ): selector.BooleanSelector()
+                    ): selector.BooleanSelector(),
+                    vol.Required(
+                        "edit_influx",
+                        default=False,
+                    ): selector.BooleanSelector(),
                 }
             ),
+        )
+
+    async def async_step_influx(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Allow editing InfluxDB connection details."""
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
+
+        if user_input is not None:
+            client = SolectrusInfluxClient(
+                url=user_input[CONF_URL],
+                token=user_input[CONF_TOKEN],
+                org=user_input[CONF_ORG],
+                bucket=user_input[CONF_BUCKET],
+            )
+            try:
+                await client.async_validate_connection()
+            except SolectrusInfluxError as exc:
+                errors["base"] = "cannot_connect"
+                placeholders["error"] = str(exc)
+                LOGGER.warning(
+                    "Influx validation failed (%s): %s", type(exc).__name__, exc
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors["base"] = "unknown"
+                LOGGER.exception("Unexpected error during Influx validation: %s", exc)
+            else:
+                new_data = {**self._config_entry.data, **user_input}
+                self.hass.config_entries.async_update_entry(
+                    self._config_entry, data=new_data
+                )
+                await client.async_close()
+                return await self.async_step_sensors()
+            finally:
+                await client.async_close()
+
+        defaults = user_input or self._config_entry.data
+        return self.async_show_form(
+            step_id="influx",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_URL,
+                        default=defaults.get(CONF_URL, vol.UNDEFINED),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.URL,
+                        ),
+                    ),
+                    vol.Required(
+                        CONF_TOKEN,
+                        default=defaults.get(CONF_TOKEN, vol.UNDEFINED),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD,
+                        ),
+                    ),
+                    vol.Required(
+                        CONF_ORG,
+                        default=defaults.get(CONF_ORG, vol.UNDEFINED),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.TEXT,
+                        ),
+                    ),
+                    vol.Required(
+                        CONF_BUCKET,
+                        default=defaults.get(CONF_BUCKET, vol.UNDEFINED),
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.TEXT,
+                        ),
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders=placeholders or None,
         )
 
     async def async_step_sensors(
