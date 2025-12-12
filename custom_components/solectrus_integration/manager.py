@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant, State
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
+from .const import LOGGER
 
 BATCH_INTERVAL = timedelta(seconds=5)
 
@@ -148,8 +149,11 @@ class SensorManager:
         if not self._pending:
             return
 
+        pending = self._pending
+        self._pending = {}
+
         points: list[Point] = []
-        for item in self._pending.values():
+        for item in pending.values():
             point = Point(item.sensor.measurement)
             point.field(item.sensor.field, item.value)
             point.time(item.timestamp, WritePrecision.S)
@@ -157,9 +161,15 @@ class SensorManager:
 
         try:
             await self._client.async_write_batch(points)
-            self._pending = {}
-        except SolectrusInfluxError:
-            pass  # Keep pending for next attempt
+        except SolectrusInfluxError as err:
+            # Keep pending for next attempt; preserve newer values already queued.
+            for key, item in pending.items():
+                self._pending.setdefault(key, item)
+            LOGGER.debug(
+                "Influx batch write failed; keeping points for retry: %s",
+                err,
+                exc_info=True,
+            )
 
     @staticmethod
     def _coerce_value(value: Any, data_type: str) -> Any | None:
