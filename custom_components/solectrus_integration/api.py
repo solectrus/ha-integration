@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import ssl
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
 
 from .const import LOGGER
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class SolectrusInfluxError(Exception):
@@ -59,6 +62,7 @@ class SolectrusInfluxClient:
         measurement: str,
         field: str,
         value: Any,
+        timestamp: datetime | None = None,
     ) -> None:
         """Write a point to InfluxDB."""
         if self._write_api is None:
@@ -66,6 +70,8 @@ class SolectrusInfluxClient:
 
         point = Point(measurement)
         point.field(field, value)
+        if timestamp is not None:
+            point.time(timestamp, WritePrecision.S)
 
         loop = asyncio.get_running_loop()
         try:

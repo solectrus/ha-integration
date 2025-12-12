@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,6 +16,7 @@ from homeassistant.helpers.event import (
 from homeassistant.util import dt as dt_util
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
+from .buffer import SensorBuffer
 
 MIN_WRITE_GAP = timedelta(seconds=5)
 MAX_WRITE_GAP = timedelta(minutes=5)
@@ -53,6 +55,7 @@ class ConfiguredSensor:
     data_type: str
     last_value: Any | None = None
     last_sent_at: datetime | None = None
+    buffer: SensorBuffer = field(default_factory=SensorBuffer)
 
 
 class SensorManager:
@@ -70,6 +73,7 @@ class SensorManager:
         self._sensors = sensors
         self._unsub_state = None
         self._unsub_interval = None
+        self._lock = asyncio.Lock()
 
     async def async_start(self) -> None:
         """Start listening for state updates."""
@@ -121,9 +125,11 @@ class SensorManager:
         await self._maybe_send(sensor, value)
 
     async def _handle_interval(self, _now: datetime) -> None:
-        """Ensure values are sent at least every MAX_WRITE_GAP."""
+        """Ensure values are sent at least every MAX_WRITE_GAP and flush buffers."""
         now = dt_util.utcnow()
         for sensor in self._sensors.values():
+            async with self._lock:
+                await self._flush_buffer(sensor, now)
             if sensor.last_value is None:
                 continue
             if sensor.last_value == 0:
@@ -151,19 +157,45 @@ class SensorManager:
         timestamp: datetime,
     ) -> None:
         """Write a value to InfluxDB."""
-        value = self._coerce_value(value, sensor.data_type)
-        if value is None:
-            return
-        try:
+        async with self._lock:
+            coerced_value = self._coerce_value(value, sensor.data_type)
+            if coerced_value is None:
+                return
+
+            # Try to flush any buffered values first to preserve order.
+            if sensor.buffer.has_items():
+                flushed = await self._flush_buffer(sensor, timestamp)
+                if not flushed:
+                    sensor.buffer.enqueue(coerced_value, timestamp)
+                    return
+
+            try:
+                await self._client.async_write(
+                    measurement=sensor.measurement,
+                    field=sensor.field,
+                    value=coerced_value,
+                    timestamp=timestamp,
+                )
+                sensor.last_sent_at = timestamp
+            except SolectrusInfluxError:
+                # Error already logged inside the client.
+                sensor.buffer.enqueue(coerced_value, timestamp)
+                return
+
+    async def _flush_buffer(self, sensor: ConfiguredSensor, now: datetime) -> bool:
+        """Attempt to write buffered values oldest-first."""
+
+        async def _write(ts: datetime, val: Any) -> None:
             await self._client.async_write(
                 measurement=sensor.measurement,
                 field=sensor.field,
-                value=value,
+                value=val,
+                timestamp=ts,
             )
-            sensor.last_sent_at = timestamp
-        except SolectrusInfluxError:
-            # Error already logged inside the client.
-            return
+
+        return await sensor.buffer.flush(
+            _write, now, error_types=(SolectrusInfluxError,)
+        )
 
     @staticmethod
     def _coerce_value(value: Any, data_type: str) -> Any | None:
