@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Connect Home Assistant to your SOLECTRUS instance.",
+        "description": "Connect Home Assistant to your SOLECTRUS instance. After setup, create a sensor mapping in the integration options so data will be exported.",
         "data": {
           "url": "InfluxDB URL",
           "token": "API token",
@@ -19,10 +19,11 @@
   "options": {
     "step": {
       "init": {
-        "description": "Map SOLECTRUS sensors to Home Assistant entities. Measurement and field are optional; defaults are pre-filled.",
-        "data": {
-          "advanced": "Show advanced options (measurement, field, data type)",
-          "edit_influx": "Edit InfluxDB connection settings"
+        "description": "What do you want to configure?",
+        "menu_options": {
+          "influx": "InfluxDB connection",
+          "sensors_simple": "Mapping (simple)",
+          "sensors_advanced": "Mapping (advanced)"
         }
       },
       "influx": {

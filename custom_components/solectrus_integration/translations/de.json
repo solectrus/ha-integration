@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Stelle die Verbindung zu deiner SOLECTRUS-Instanz her.",
+        "description": "Stelle die Verbindung zu deiner SOLECTRUS-Instanz her. Danach musst du in den Optionen ein Sensor‑Mapping erstellen, damit Daten exportiert werden.",
         "data": {
           "url": "InfluxDB-URL",
           "token": "API-Token",
@@ -19,10 +19,11 @@
   "options": {
     "step": {
       "init": {
-        "description": "Ordne SOLECTRUS-Sensoren Home-Assistant-Sensoren zu. Measurement und Feld sind optional; Standardwerte sind vorbelegt.",
-        "data": {
-          "advanced": "Erweiterte Optionen anzeigen (Measurement, Feld, Datentyp)",
-          "edit_influx": "InfluxDB-Verbindungsdaten bearbeiten"
+        "description": "Was möchtest du konfigurieren?",
+        "menu_options": {
+          "influx": "InfluxDB-Verbindung",
+          "sensors_simple": "Zuordnung (einfach)",
+          "sensors_advanced": "Zuordnung (erweitert)"
         }
       },
       "influx": {

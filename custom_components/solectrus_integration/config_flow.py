@@ -62,7 +62,7 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 await client.async_close()
                 return self.async_create_entry(
-                    title="SOLECTRUS",
+                    title="InfluxDB-Exporter",
                     data=user_input,
                 )
             finally:
@@ -129,30 +129,27 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
         self._show_advanced: bool = bool(config_entry.options.get("advanced", False))
 
     async def async_step_init(
-        self, user_input: dict | None = None
+        self, _user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Decide whether to edit Influx settings or sensors."""
-        if user_input is not None:
-            self._show_advanced = user_input.get("advanced", False)
-            if user_input.get("edit_influx", False):
-                return await self.async_step_influx()
-            return await self.async_step_sensors()
-
-        return self.async_show_form(
+        """Show a menu for choosing what to edit."""
+        return self.async_show_menu(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        "advanced",
-                        default=self._show_advanced,
-                    ): selector.BooleanSelector(),
-                    vol.Required(
-                        "edit_influx",
-                        default=False,
-                    ): selector.BooleanSelector(),
-                }
-            ),
+            menu_options=["influx", "sensors_simple", "sensors_advanced"],
         )
+
+    async def async_step_sensors_simple(
+        self, _user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Configure sensor mapping without advanced fields."""
+        self._show_advanced = False
+        return await self.async_step_sensors()
+
+    async def async_step_sensors_advanced(
+        self, _user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Configure sensor mapping with advanced fields."""
+        self._show_advanced = True
+        return await self.async_step_sensors()
 
     async def async_step_influx(
         self, user_input: dict | None = None
@@ -185,7 +182,11 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                     self._config_entry, data=new_data
                 )
                 await client.async_close()
-                return await self.async_step_sensors()
+                current_options = dict(self._config_entry.options)
+                return self.async_create_entry(
+                    title=self._config_entry.title,
+                    data=current_options,
+                )
             finally:
                 await client.async_close()
 
@@ -237,25 +238,12 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Manage the sensor mapping options."""
         if user_input is not None:
-            sensors: dict[str, dict[str, str]] = {}
             existing_sensors: dict = self._config_entry.options.get(CONF_SENSORS, {})
-            for key, definition in SENSOR_DEFINITIONS.items():
-                configured = existing_sensors.get(key, {})
-                entity_id = user_input.get(f"{key}_entity")
-                measurement = configured.get(CONF_MEASUREMENT, definition.measurement)
-                field = configured.get(CONF_FIELD, definition.field)
-                data_type = configured.get(CONF_DATA_TYPE, definition.data_type)
-                if self._show_advanced:
-                    measurement = user_input.get(f"{key}_measurement") or measurement
-                    field = user_input.get(f"{key}_field") or field
-                    data_type = user_input.get(f"{key}_data_type") or data_type
-                if entity_id:
-                    sensors[key] = {
-                        CONF_ENTITY_ID: entity_id,
-                        CONF_MEASUREMENT: measurement,
-                        CONF_FIELD: field,
-                        CONF_DATA_TYPE: data_type,
-                    }
+            sensors = _parse_sensors_input(
+                user_input,
+                existing_sensors,
+                show_advanced=self._show_advanced,
+            )
 
             return self.async_create_entry(
                 title=self._config_entry.title,
@@ -263,54 +251,83 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
             )
 
         options_sensors: dict = self._config_entry.options.get(CONF_SENSORS, {})
-        schema_dict: dict = {}
-        for key, definition in SENSOR_DEFINITIONS.items():
-            configured = options_sensors.get(key, {})
-            schema_dict[
-                vol.Optional(
-                    f"{key}_entity",
-                    default=configured.get(CONF_ENTITY_ID, vol.UNDEFINED),
-                )
-            ] = vol.Any(
-                None,
-                selector.EntitySelector(selector.EntitySelectorConfig()),
-            )
-            if self._show_advanced:
-                schema_dict[
-                    vol.Optional(
-                        f"{key}_measurement",
-                        default=configured.get(
-                            CONF_MEASUREMENT, definition.measurement
-                        ),
-                    )
-                ] = selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.TEXT,
-                    )
-                )
-                schema_dict[
-                    vol.Optional(
-                        f"{key}_field",
-                        default=configured.get(CONF_FIELD, definition.field),
-                    )
-                ] = selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.TEXT,
-                    )
-                )
-                schema_dict[
-                    vol.Optional(
-                        f"{key}_data_type",
-                        default=configured.get(CONF_DATA_TYPE, definition.data_type),
-                    )
-                ] = selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=DATA_TYPE_OPTIONS,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    )
-                )
+        schema_dict = _build_sensors_schema(
+            options_sensors, show_advanced=self._show_advanced
+        )
 
         return self.async_show_form(
             step_id="sensors",
             data_schema=vol.Schema(schema_dict),
         )
+
+
+def _build_sensors_schema(existing_sensors: dict, *, show_advanced: bool) -> dict:
+    schema_dict: dict = {}
+    for key, definition in SENSOR_DEFINITIONS.items():
+        configured = existing_sensors.get(key, {})
+        schema_dict[
+            vol.Optional(
+                f"{key}_entity",
+                default=configured.get(CONF_ENTITY_ID, vol.UNDEFINED),
+            )
+        ] = vol.Any(
+            None,
+            selector.EntitySelector(selector.EntitySelectorConfig()),
+        )
+        if show_advanced:
+            schema_dict[
+                vol.Optional(
+                    f"{key}_measurement",
+                    default=configured.get(CONF_MEASUREMENT, definition.measurement),
+                )
+            ] = selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.TEXT,
+                )
+            )
+            schema_dict[
+                vol.Optional(
+                    f"{key}_field",
+                    default=configured.get(CONF_FIELD, definition.field),
+                )
+            ] = selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.TEXT,
+                )
+            )
+            schema_dict[
+                vol.Optional(
+                    f"{key}_data_type",
+                    default=configured.get(CONF_DATA_TYPE, definition.data_type),
+                )
+            ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=DATA_TYPE_OPTIONS,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+    return schema_dict
+
+
+def _parse_sensors_input(
+    user_input: dict, existing_sensors: dict, *, show_advanced: bool
+) -> dict[str, dict[str, str]]:
+    sensors: dict[str, dict[str, str]] = {}
+    for key, definition in SENSOR_DEFINITIONS.items():
+        configured = existing_sensors.get(key, {})
+        entity_id = user_input.get(f"{key}_entity")
+        measurement = configured.get(CONF_MEASUREMENT, definition.measurement)
+        field = configured.get(CONF_FIELD, definition.field)
+        data_type = configured.get(CONF_DATA_TYPE, definition.data_type)
+        if show_advanced:
+            measurement = user_input.get(f"{key}_measurement") or measurement
+            field = user_input.get(f"{key}_field") or field
+            data_type = user_input.get(f"{key}_data_type") or data_type
+        if entity_id:
+            sensors[key] = {
+                CONF_ENTITY_ID: entity_id,
+                CONF_MEASUREMENT: measurement,
+                CONF_FIELD: field,
+                CONF_DATA_TYPE: data_type,
+            }
+    return sensors
