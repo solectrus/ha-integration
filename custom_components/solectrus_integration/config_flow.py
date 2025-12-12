@@ -60,7 +60,6 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 unique_id = f"{user_input[CONF_URL]}::{user_input[CONF_BUCKET]}"
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
-                await client.async_close()
                 return self.async_create_entry(
                     title="InfluxDB-Exporter",
                     data=user_input,
@@ -181,7 +180,6 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                 self.hass.config_entries.async_update_entry(
                     self._config_entry, data=new_data
                 )
-                await client.async_close()
                 current_options = dict(self._config_entry.options)
                 return self.async_create_entry(
                     title=self._config_entry.title,
