@@ -29,6 +29,57 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for SOLECTRUS."""
 
     VERSION = 1
+    reconfigure_supported = True
+
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        self._reconfigure_entry: config_entries.ConfigEntry | None = None
+
+    async def async_step_reconfigure(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Handle reconfiguration of an existing entry."""
+        entry_id = self.context.get("entry_id")
+        entry = self.hass.config_entries.async_get_entry(entry_id) if entry_id else None
+        if entry is None:
+            return self.async_abort(reason="unknown")
+
+        self._reconfigure_entry = entry
+
+        errors: dict[str, str] = {}
+        placeholders: dict[str, str] = {}
+        if user_input is not None:
+            client = SolectrusInfluxClient(
+                url=user_input[CONF_URL],
+                token=user_input[CONF_TOKEN],
+                org=user_input[CONF_ORG],
+                bucket=user_input[CONF_BUCKET],
+            )
+            try:
+                await client.async_validate_connection()
+            except SolectrusInfluxError as exc:
+                errors["base"] = "cannot_connect"
+                placeholders["error"] = str(exc)
+                LOGGER.warning(
+                    "Influx validation failed (%s): %s", type(exc).__name__, exc
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors["base"] = "unknown"
+                LOGGER.exception("Unexpected error during Influx validation: %s", exc)
+            else:
+                return self.async_update_reload_and_abort(
+                    entry, data_updates=user_input
+                )
+            finally:
+                await client.async_close()
+
+        defaults = user_input or entry.data
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_influx_schema(defaults),
+            errors=errors,
+            description_placeholders=placeholders or None,
+        )
 
     async def async_step_user(
         self,
@@ -70,42 +121,7 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         defaults = user_input or {}
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_URL,
-                        default=defaults.get(CONF_URL, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.URL,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_TOKEN,
-                        default=defaults.get(CONF_TOKEN, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.PASSWORD,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_ORG,
-                        default=defaults.get(CONF_ORG, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.TEXT,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_BUCKET,
-                        default=defaults.get(CONF_BUCKET, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.TEXT,
-                        ),
-                    ),
-                },
-            ),
+            data_schema=_influx_schema(defaults),
             errors=errors,
             description_placeholders=placeholders or None,
         )
@@ -128,107 +144,23 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
         self._show_advanced: bool = bool(config_entry.options.get("advanced", False))
 
     async def async_step_init(
-        self, _user_input: dict | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Show a menu for choosing what to edit."""
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["influx", "sensors_simple", "sensors_advanced"],
-        )
-
-    async def async_step_sensors_simple(
-        self, _user_input: dict | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Configure sensor mapping without advanced fields."""
-        self._show_advanced = False
-        return await self.async_step_sensors()
-
-    async def async_step_sensors_advanced(
-        self, _user_input: dict | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Configure sensor mapping with advanced fields."""
-        self._show_advanced = True
-        return await self.async_step_sensors()
-
-    async def async_step_influx(
         self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Allow editing InfluxDB connection details."""
-        errors: dict[str, str] = {}
-        placeholders: dict[str, str] = {}
-
+        """Start options flow."""
         if user_input is not None:
-            client = SolectrusInfluxClient(
-                url=user_input[CONF_URL],
-                token=user_input[CONF_TOKEN],
-                org=user_input[CONF_ORG],
-                bucket=user_input[CONF_BUCKET],
-            )
-            try:
-                await client.async_validate_connection()
-            except SolectrusInfluxError as exc:
-                errors["base"] = "cannot_connect"
-                placeholders["error"] = str(exc)
-                LOGGER.warning(
-                    "Influx validation failed (%s): %s", type(exc).__name__, exc
-                )
-            except Exception as exc:  # noqa: BLE001
-                errors["base"] = "unknown"
-                LOGGER.exception("Unexpected error during Influx validation: %s", exc)
-            else:
-                new_data = {**self._config_entry.data, **user_input}
-                self.hass.config_entries.async_update_entry(
-                    self._config_entry, data=new_data
-                )
-                current_options = dict(self._config_entry.options)
-                return self.async_create_entry(
-                    title=self._config_entry.title,
-                    data=current_options,
-                )
-            finally:
-                await client.async_close()
+            self._show_advanced = bool(user_input.get("advanced", False))
+            return await self.async_step_sensors()
 
-        defaults = user_input or self._config_entry.data
         return self.async_show_form(
-            step_id="influx",
+            step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_URL,
-                        default=defaults.get(CONF_URL, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.URL,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_TOKEN,
-                        default=defaults.get(CONF_TOKEN, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.PASSWORD,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_ORG,
-                        default=defaults.get(CONF_ORG, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.TEXT,
-                        ),
-                    ),
-                    vol.Required(
-                        CONF_BUCKET,
-                        default=defaults.get(CONF_BUCKET, vol.UNDEFINED),
-                    ): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.TEXT,
-                        ),
-                    ),
+                    vol.Optional(
+                        "advanced",
+                        default=bool(self._config_entry.options.get("advanced", False)),
+                    ): selector.BooleanSelector(selector.BooleanSelectorConfig())
                 }
             ),
-            errors=errors,
-            description_placeholders=placeholders or None,
         )
 
     async def async_step_sensors(
@@ -259,8 +191,49 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
 
+def _influx_schema(defaults: dict) -> vol.Schema:
+    """Build schema for InfluxDB connection fields."""
+    return vol.Schema(
+        {
+            vol.Required(
+                CONF_URL,
+                default=defaults.get(CONF_URL, vol.UNDEFINED),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.URL,
+                ),
+            ),
+            vol.Required(
+                CONF_TOKEN,
+                default=defaults.get(CONF_TOKEN, vol.UNDEFINED),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.PASSWORD,
+                ),
+            ),
+            vol.Required(
+                CONF_ORG,
+                default=defaults.get(CONF_ORG, vol.UNDEFINED),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.TEXT,
+                ),
+            ),
+            vol.Required(
+                CONF_BUCKET,
+                default=defaults.get(CONF_BUCKET, vol.UNDEFINED),
+            ): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.TEXT,
+                ),
+            ),
+        }
+    )
+
+
 def _build_sensors_schema(existing_sensors: dict, *, show_advanced: bool) -> dict:
     schema_dict: dict = {}
+
     for key, definition in SENSOR_DEFINITIONS.items():
         configured = existing_sensors.get(key, {})
         schema_dict[

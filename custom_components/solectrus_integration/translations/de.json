@@ -9,7 +9,19 @@
           "org": "Organisation",
           "bucket": "Bucket"
         }
+      },
+      "reconfigure": {
+        "description": "Aktualisiere die für SOLECTRUS verwendeten InfluxDB-Verbindungsdaten.",
+        "data": {
+          "url": "InfluxDB-URL",
+          "token": "API-Token",
+          "org": "Organisation",
+          "bucket": "Bucket"
+        }
       }
+    },
+    "abort": {
+      "reconfigure_successful": "Rekonfiguration erfolgreich. Die Integration wird neu geladen."
     },
     "error": {
       "cannot_connect": "Verbindungstest zu InfluxDB fehlgeschlagen: {error}. Bitte URL, Token, Organisation und Bucket prüfen.",
@@ -19,23 +31,13 @@
   "options": {
     "step": {
       "init": {
-        "description": "Was möchtest du konfigurieren?",
-        "menu_options": {
-          "influx": "InfluxDB-Verbindung",
-          "sensors_simple": "Zuordnung (einfach)",
-          "sensors_advanced": "Zuordnung (erweitert)"
-        }
-      },
-      "influx": {
-        "description": "Aktualisiere die für SOLECTRUS verwendeten InfluxDB-Verbindungsdaten.",
+        "description": "Lege fest, ob du nur Entitäten zuordnen möchtest oder zusätzlich Measurement/Field/Datentyp pro Eintrag anpassen willst. Danach wählst du die zu exportierenden Entitäten aus.",
         "data": {
-          "url": "InfluxDB-URL",
-          "token": "API-Token",
-          "org": "Organisation",
-          "bucket": "Bucket"
+          "advanced": "Erweitert"
         }
       },
       "sensors": {
+        "description": "Wähle die Home‑Assistant-Entitäten aus, die nach InfluxDB exportiert werden sollen.",
         "data": {
           "INVERTER_POWER_entity": "Wechselrichterleistung (aktuell erzeugter Strom)",
           "INVERTER_POWER_measurement": "↳ Measurement",

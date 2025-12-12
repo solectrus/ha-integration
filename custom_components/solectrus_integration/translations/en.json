@@ -9,7 +9,19 @@
           "org": "Organization",
           "bucket": "Bucket"
         }
+      },
+      "reconfigure": {
+        "description": "Update the InfluxDB connection details used by SOLECTRUS.",
+        "data": {
+          "url": "InfluxDB URL",
+          "token": "API token",
+          "org": "Organization",
+          "bucket": "Bucket"
+        }
       }
+    },
+    "abort": {
+      "reconfigure_successful": "Reconfiguration successful. The integration will be reloaded."
     },
     "error": {
       "cannot_connect": "Connection test to InfluxDB failed: {error}. Please verify URL, token, org, and bucket.",
@@ -19,23 +31,13 @@
   "options": {
     "step": {
       "init": {
-        "description": "What do you want to configure?",
-        "menu_options": {
-          "influx": "InfluxDB connection",
-          "sensors_simple": "Mapping (simple)",
-          "sensors_advanced": "Mapping (advanced)"
-        }
-      },
-      "influx": {
-        "description": "Update the InfluxDB connection details used by SOLECTRUS.",
+        "description": "Choose whether you only want to map entities or also customize measurement/field/data type per item. Then select the entities to export.",
         "data": {
-          "url": "InfluxDB URL",
-          "token": "API token",
-          "org": "Organization",
-          "bucket": "Bucket"
+          "advanced": "Advanced"
         }
       },
       "sensors": {
+        "description": "Select the Home Assistant entities to export to InfluxDB.",
         "data": {
           "INVERTER_POWER_entity": "Inverter power (current production)",
           "INVERTER_POWER_measurement": "↳ Measurement",
