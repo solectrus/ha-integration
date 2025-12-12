@@ -48,6 +48,9 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     "INVERTER_POWER_3": SensorDefinition("inverter_3", "power", DATA_TYPE_INT),
     "INVERTER_POWER_4": SensorDefinition("inverter_4", "power", DATA_TYPE_INT),
     "INVERTER_POWER_5": SensorDefinition("inverter_5", "power", DATA_TYPE_INT),
+    "INVERTER_POWER_FORECAST": SensorDefinition(
+        "inverter_forecast", "power", DATA_TYPE_INT
+    ),
     "HOUSE_POWER": SensorDefinition("house", "power", DATA_TYPE_INT),
     "BATTERY_SOC": SensorDefinition("battery", "soc", DATA_TYPE_FLOAT),
     "BATTERY_CHARGING_POWER": SensorDefinition(
@@ -58,17 +61,21 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     ),
     "HEATPUMP_POWER": SensorDefinition("heatpump", "power", DATA_TYPE_INT),
     "HEATPUMP_TANK_TEMP": SensorDefinition("heatpump", "tank_temp", DATA_TYPE_FLOAT),
+    "HEATPUMP_STATUS": SensorDefinition("heatpump", "status", DATA_TYPE_STRING),
     "OUTDOOR_TEMP_FORECAST": SensorDefinition(
         "outdoor_forecast", "temperature", DATA_TYPE_FLOAT
     ),
     "GRID_POWER_EXPORT": SensorDefinition("grid", "export_power", DATA_TYPE_INT),
+    "GRID_EXPORT_LIMIT": SensorDefinition("grid", "export_limit", DATA_TYPE_INT),
     "GRID_POWER_IMPORT": SensorDefinition("grid", "import_power", DATA_TYPE_INT),
     "WALLBOX_POWER": SensorDefinition("wallbox", "power", DATA_TYPE_INT),
+    "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
     "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
     "CAR_BATTERY_SOC": SensorDefinition("car", "battery_soc", DATA_TYPE_FLOAT),
     "CAR_MILEAGE": SensorDefinition("car", "mileage", DATA_TYPE_INT),
     "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
     "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
+    "SYSTEM_STATUS_OK": SensorDefinition("system", "status_ok", DATA_TYPE_BOOL),
 }
 
 for index in range(1, 21):
