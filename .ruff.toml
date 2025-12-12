@@ -13,6 +13,9 @@ ignore = [
     "D212", # multi-line-summary-first-line (incompatible with formatter)
     "COM812", # incompatible with formatter
     "ISC001", # incompatible with formatter
+    "TRY003", # Avoid specifying long messages outside the exception class
+    "EM101",  # Exception must not use a string literal
+    "EM102",  # Exception must not use an f-string literal
 ]
 
 [lint.flake8-pytest-style]

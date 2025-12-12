@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -13,15 +12,14 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 from homeassistant.util import dt as dt_util
+from influxdb_client import Point, WritePrecision
 
 if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant, State
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
-from .buffer import SensorBuffer
 
-MIN_WRITE_GAP = timedelta(seconds=5)
-MAX_WRITE_GAP = timedelta(minutes=5)
+BATCH_INTERVAL = timedelta(seconds=5)
 
 BOOL_STRING_MAP: dict[str, bool] = {
     "on": True,
@@ -56,8 +54,15 @@ class ConfiguredSensor:
     field: str
     data_type: str
     last_value: Any | None = None
-    last_sent_at: datetime | None = None
-    buffer: SensorBuffer = field(default_factory=SensorBuffer)
+
+
+@dataclass
+class PendingPoint:
+    """A point waiting to be sent."""
+
+    sensor: ConfiguredSensor
+    value: Any
+    timestamp: datetime
 
 
 class SensorManager:
@@ -74,18 +79,18 @@ class SensorManager:
         self._client = client
         self._sensors = sensors
         self._unsub_state = None
-        self._unsub_interval = None
-        self._lock = asyncio.Lock()
+        self._unsub_batch = None
+        self._pending: dict[str, PendingPoint] = {}
 
     async def async_start(self) -> None:
         """Start listening for state updates."""
-        initial_sensors: list[ConfiguredSensor] = []
+        # Queue initial values
         for sensor in self._sensors.values():
             current_state = self._hass.states.get(sensor.entity_id)
             value = self._state_to_value(current_state)
             if value is not None:
                 sensor.last_value = value
-                initial_sensors.append(sensor)
+                self._queue_point(sensor, value)
 
         entity_ids = [sensor.entity_id for sensor in self._sensors.values()]
         if entity_ids:
@@ -94,21 +99,24 @@ class SensorManager:
                 entity_ids,
                 self._handle_state_change,
             )
-        self._unsub_interval = async_track_time_interval(
-            self._hass, self._handle_interval, timedelta(minutes=1)
+        self._unsub_batch = async_track_time_interval(
+            self._hass, self._flush_batch, BATCH_INTERVAL
         )
 
-        for sensor in initial_sensors:
-            await self._maybe_send(sensor, sensor.last_value)
+        # Send initial batch immediately
+        await self._flush_batch(dt_util.utcnow())
 
     async def async_stop(self) -> None:
         """Stop listeners and timers."""
         if self._unsub_state:
             self._unsub_state()
             self._unsub_state = None
-        if self._unsub_interval:
-            self._unsub_interval()
-            self._unsub_interval = None
+        if self._unsub_batch:
+            self._unsub_batch()
+            self._unsub_batch = None
+        # Flush remaining points
+        if self._pending:
+            await self._flush_batch(dt_util.utcnow())
 
     async def _handle_state_change(self, event: Event) -> None:
         """Handle a new state."""
@@ -123,78 +131,35 @@ class SensorManager:
             return
 
         sensor.last_value = value
-        await self._maybe_send(sensor, value)
+        self._queue_point(sensor, value)
 
-    async def _handle_interval(self, _now: datetime) -> None:
-        """Ensure values are sent at least every MAX_WRITE_GAP and flush buffers."""
-        now = dt_util.utcnow()
-        for sensor in self._sensors.values():
-            if sensor.last_value is None:
-                # No value to send, but try to flush any buffered values.
-                async with self._lock:
-                    await self._flush_buffer(sensor, now)
-                continue
-            if sensor.last_sent_at is None or (
-                now - sensor.last_sent_at >= MAX_WRITE_GAP
-            ):
-                await self._send(sensor, sensor.last_value, now)
-
-    async def _maybe_send(self, sensor: ConfiguredSensor, value: Any) -> None:
-        """Send value if throttling allows."""
-        now = dt_util.utcnow()
-        if (
-            sensor.last_sent_at is not None
-            and now - sensor.last_sent_at < MIN_WRITE_GAP
-        ):
+    def _queue_point(self, sensor: ConfiguredSensor, value: Any) -> None:
+        """Add a point to the pending batch, overwriting any previous value."""
+        coerced = self._coerce_value(value, sensor.data_type)
+        if coerced is None:
             return
-        await self._send(sensor, value, now)
 
-    async def _send(
-        self,
-        sensor: ConfiguredSensor,
-        value: Any,
-        timestamp: datetime,
-    ) -> None:
-        """Write a value to InfluxDB."""
-        async with self._lock:
-            coerced_value = self._coerce_value(value, sensor.data_type)
-            if coerced_value is None:
-                return
-
-            # Try to flush any buffered values first to preserve order.
-            if sensor.buffer.has_items():
-                flushed = await self._flush_buffer(sensor, timestamp)
-                if not flushed:
-                    sensor.buffer.enqueue(coerced_value, timestamp)
-                    return
-
-            try:
-                await self._client.async_write(
-                    measurement=sensor.measurement,
-                    field=sensor.field,
-                    value=coerced_value,
-                    timestamp=timestamp,
-                )
-                sensor.last_sent_at = timestamp
-            except SolectrusInfluxError:
-                # Error already logged inside the client.
-                sensor.buffer.enqueue(coerced_value, timestamp)
-                return
-
-    async def _flush_buffer(self, sensor: ConfiguredSensor, now: datetime) -> bool:
-        """Attempt to write buffered values oldest-first."""
-
-        async def _write(ts: datetime, val: Any) -> None:
-            await self._client.async_write(
-                measurement=sensor.measurement,
-                field=sensor.field,
-                value=val,
-                timestamp=ts,
-            )
-
-        return await sensor.buffer.flush(
-            _write, now, error_types=(SolectrusInfluxError,)
+        self._pending[sensor.key] = PendingPoint(
+            sensor=sensor, value=coerced, timestamp=dt_util.utcnow()
         )
+
+    async def _flush_batch(self, _now: datetime) -> None:
+        """Send all pending points as a batch."""
+        if not self._pending:
+            return
+
+        points: list[Point] = []
+        for item in self._pending.values():
+            point = Point(item.sensor.measurement)
+            point.field(item.sensor.field, item.value)
+            point.time(item.timestamp, WritePrecision.S)
+            points.append(point)
+
+        try:
+            await self._client.async_write_batch(points)
+            self._pending = {}
+        except SolectrusInfluxError:
+            pass  # Keep pending for next attempt
 
     @staticmethod
     def _coerce_value(value: Any, data_type: str) -> Any | None:

@@ -8,15 +8,29 @@ from typing import TYPE_CHECKING, Any
 
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi
+from influxdb_client.rest import ApiException
+from urllib3.exceptions import HTTPError
 
 from .const import LOGGER
 
 if TYPE_CHECKING:
     from datetime import datetime
 
+# HTTP status codes
+_HTTP_UNAUTHORIZED = 401
+_HTTP_FORBIDDEN = 403
+
 
 class SolectrusInfluxError(Exception):
-    """Base exception for InfluxDB write issues."""
+    """Base exception for InfluxDB issues."""
+
+
+class SolectrusConnectionError(SolectrusInfluxError):
+    """Raised when connection to InfluxDB fails."""
+
+
+class SolectrusAuthError(SolectrusInfluxError):
+    """Raised when authentication fails."""
 
 
 class SolectrusInfluxClient:
@@ -40,13 +54,19 @@ class SolectrusInfluxClient:
             bucket = await loop.run_in_executor(
                 None, lambda: client.buckets_api().find_bucket_by_name(self._bucket)
             )
-        except Exception as err:  # pylint: disable=broad-except
-            message = f"Bucket lookup failed: {err}"
-            raise SolectrusInfluxError(message) from err
+        except ApiException as err:
+            if err.status in (_HTTP_UNAUTHORIZED, _HTTP_FORBIDDEN):
+                msg = "Invalid token or insufficient permissions"
+                raise SolectrusAuthError(msg) from err
+            msg = f"API error: {err}"
+            raise SolectrusInfluxError(msg) from err
+        except (HTTPError, OSError) as err:
+            msg = f"Connection failed: {err}"
+            raise SolectrusConnectionError(msg) from err
 
         if bucket is None:
-            message = "Bucket not found or token lacks permission to read it"
-            raise SolectrusInfluxError(message)
+            msg = "Bucket not found or token lacks permission"
+            raise SolectrusInfluxError(msg)
 
     async def async_connect(self) -> None:
         """Prepare the write API."""
@@ -84,9 +104,44 @@ class SolectrusInfluxClient:
                     write_precision=WritePrecision.S,
                 ),
             )
-        except Exception as err:  # pylint: disable=broad-except
-            LOGGER.error("Failed to write point to InfluxDB: %s", err)
-            raise SolectrusInfluxError(err) from err
+        except ApiException as err:
+            if err.status == _HTTP_UNAUTHORIZED:
+                LOGGER.error("InfluxDB authentication failed")
+                raise SolectrusAuthError("Authentication failed") from err
+            LOGGER.error("InfluxDB API error: %s", err)
+            raise SolectrusInfluxError(f"API error: {err}") from err
+        except (HTTPError, OSError) as err:
+            LOGGER.warning("InfluxDB connection failed: %s", err)
+            raise SolectrusConnectionError(f"Connection failed: {err}") from err
+
+    async def async_write_batch(self, points: list[Point]) -> None:
+        """Write multiple points to InfluxDB in a single request."""
+        if not points:
+            return
+
+        if self._write_api is None:
+            await self.async_connect()
+
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: self._write_api.write(
+                    bucket=self._bucket,
+                    org=self._org,
+                    record=points,
+                    write_precision=WritePrecision.S,
+                ),
+            )
+        except ApiException as err:
+            if err.status == _HTTP_UNAUTHORIZED:
+                LOGGER.error("InfluxDB authentication failed")
+                raise SolectrusAuthError("Authentication failed") from err
+            LOGGER.error("InfluxDB API error: %s", err)
+            raise SolectrusInfluxError(f"API error: {err}") from err
+        except (HTTPError, OSError) as err:
+            LOGGER.warning("InfluxDB connection failed: %s", err)
+            raise SolectrusConnectionError(f"Connection failed: {err}") from err
 
     async def async_close(self) -> None:
         """Close the client."""
@@ -119,7 +174,10 @@ class SolectrusInfluxClient:
 
         try:
             self._client = await loop.run_in_executor(None, _build_client)
-        except Exception as err:  # pylint: disable=broad-except
-            message = f"Failed to create InfluxDB client: {err}"
-            raise SolectrusInfluxError(message) from err
+        except (HTTPError, OSError) as err:
+            msg = f"Connection failed: {err}"
+            raise SolectrusConnectionError(msg) from err
+        except (ValueError, TypeError) as err:
+            msg = f"Invalid configuration: {err}"
+            raise SolectrusInfluxError(msg) from err
         return self._client
