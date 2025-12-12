@@ -5,15 +5,17 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
 )
 from homeassistant.util import dt as dt_util
+
+if TYPE_CHECKING:
+    from homeassistant.core import Event, HomeAssistant, State
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .buffer import SensorBuffer
@@ -108,7 +110,6 @@ class SensorManager:
             self._unsub_interval()
             self._unsub_interval = None
 
-    @callback
     async def _handle_state_change(self, event: Event) -> None:
         """Handle a new state."""
         entity_id = event.data["entity_id"]
