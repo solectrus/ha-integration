@@ -129,9 +129,10 @@ class SensorManager:
         """Ensure values are sent at least every MAX_WRITE_GAP and flush buffers."""
         now = dt_util.utcnow()
         for sensor in self._sensors.values():
-            async with self._lock:
-                await self._flush_buffer(sensor, now)
             if sensor.last_value is None:
+                # No value to send, but try to flush any buffered values.
+                async with self._lock:
+                    await self._flush_buffer(sensor, now)
                 continue
             if sensor.last_sent_at is None or (
                 now - sensor.last_sent_at >= MAX_WRITE_GAP
