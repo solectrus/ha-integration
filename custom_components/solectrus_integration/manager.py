@@ -133,9 +133,6 @@ class SensorManager:
                 await self._flush_buffer(sensor, now)
             if sensor.last_value is None:
                 continue
-            if sensor.last_value == 0:
-                # Skip repeating zero values.
-                continue
             if sensor.last_sent_at is None or (
                 now - sensor.last_sent_at >= MAX_WRITE_GAP
             ):
