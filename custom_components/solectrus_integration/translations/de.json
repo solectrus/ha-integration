@@ -35,7 +35,7 @@
       "init": {
         "description": "Lege fest, ob du nur Entitäten zuordnen möchtest oder zusätzlich Measurement/Field/Datentyp pro Eintrag anpassen willst. Danach wählst du die zu exportierenden Entitäten aus.",
         "data": {
-          "advanced": "Erweitert"
+          "advanced": "Anpassen von Measurement und Field"
         }
       },
       "sensors": {

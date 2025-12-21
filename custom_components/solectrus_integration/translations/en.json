@@ -35,7 +35,7 @@
       "init": {
         "description": "Choose whether you only want to map entities or also customize measurement/field/data type per item. Then select the entities to export.",
         "data": {
-          "advanced": "Advanced"
+          "advanced": "Customize measurement and field"
         }
       },
       "sensors": {
