@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant, State
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
-from .const import LOGGER
+from .const import FORECAST_SENSOR_KEYS, LOGGER
 
 BATCH_INTERVAL = timedelta(seconds=5)
 
@@ -87,6 +87,8 @@ class SensorManager:
         """Start listening for state updates."""
         # Queue initial values
         for sensor in self._sensors.values():
+            if sensor.key in FORECAST_SENSOR_KEYS:
+                continue
             current_state = self._hass.states.get(sensor.entity_id)
             value = self._state_to_value(current_state)
             if value is not None:
@@ -127,6 +129,10 @@ class SensorManager:
             return
 
         new_state: State | None = event.data.get("new_state")
+        if sensor.key in FORECAST_SENSOR_KEYS:
+            await self._queue_forecast_points(sensor, new_state)
+            return
+
         value = self._state_to_value(new_state)
         if value is None:
             return
@@ -134,15 +140,122 @@ class SensorManager:
         sensor.last_value = value
         self._queue_point(sensor, value)
 
-    def _queue_point(self, sensor: ConfiguredSensor, value: Any) -> None:
+    def _queue_point(
+        self,
+        sensor: ConfiguredSensor,
+        value: Any,
+        *,
+        timestamp: datetime | None = None,
+        pending_key: str | None = None,
+    ) -> None:
         """Add a point to the pending batch, overwriting any previous value."""
         coerced = self._coerce_value(value, sensor.data_type)
         if coerced is None:
             return
 
-        self._pending[sensor.key] = PendingPoint(
-            sensor=sensor, value=coerced, timestamp=dt_util.utcnow()
+        self._pending[pending_key or sensor.key] = PendingPoint(
+            sensor=sensor,
+            value=coerced,
+            timestamp=timestamp or dt_util.utcnow(),
         )
+
+    async def _queue_forecast_points(
+        self,
+        sensor: ConfiguredSensor,
+        state: State | None,
+    ) -> None:
+        """Queue forecast time series points for the whitelisted forecast keys."""
+        if state is None:
+            return
+
+        if sensor.entity_id.startswith("weather."):
+            series = await self._weather_temperature_series(sensor.entity_id)
+        else:
+            value_key = (
+                "temperature" if sensor.key == "OUTDOOR_TEMP_FORECAST" else sensor.field
+            )
+            series = self._attribute_forecast_series(
+                state.attributes.get("forecast"),
+                value_key=value_key,
+            )
+
+        for timestamp, value in sorted(series, key=lambda pair: pair[0]):
+            self._queue_point(
+                sensor,
+                value,
+                timestamp=timestamp,
+                pending_key=f"{sensor.key}:{timestamp.isoformat()}",
+            )
+
+    async def _weather_temperature_series(
+        self,
+        entity_id: str,
+    ) -> list[tuple[datetime, Any]]:
+        try:
+            response = await self._hass.services.async_call(
+                "weather",
+                "get_forecasts",
+                {"entity_id": entity_id, "type": "hourly"},
+                blocking=True,
+                return_response=True,
+            )
+        except Exception:  # noqa: BLE001
+            return []
+
+        if not isinstance(response, dict):
+            return []
+
+        entity_payload = response.get(entity_id)
+        if not isinstance(entity_payload, dict):
+            return []
+
+        forecast_list = entity_payload.get("forecast")
+        if not isinstance(forecast_list, list):
+            return []
+
+        series: list[tuple[datetime, Any]] = []
+        for item in forecast_list:
+            if not isinstance(item, dict):
+                continue
+            raw_time = item.get("datetime")
+            if not raw_time:
+                continue
+            when = dt_util.parse_datetime(raw_time)
+            value = item.get("temperature")
+            if when is not None and value is not None:
+                series.append((dt_util.as_utc(when), value))
+
+        return series
+
+    @staticmethod
+    def _attribute_forecast_series(
+        forecast_list: Any,
+        *,
+        value_key: str,
+    ) -> list[tuple[datetime, Any]]:
+        if not isinstance(forecast_list, list):
+            return []
+
+        series: list[tuple[datetime, Any]] = []
+        for item in forecast_list:
+            if not isinstance(item, dict):
+                continue
+
+            raw_time = None
+            for key in ("datetime", "time", "period_end"):
+                candidate = item.get(key)
+                if candidate:
+                    raw_time = candidate
+                    break
+            if raw_time is None:
+                continue
+
+            when = dt_util.parse_datetime(raw_time)
+            value = item.get(value_key)
+            if when is not None and value is not None:
+                series.append((dt_util.as_utc(when), value))
+
+        return series
 
     async def _flush_batch(self, _now: datetime) -> None:
         """Send all pending points as a batch."""

@@ -10,6 +10,12 @@ LOGGER: Logger = getLogger(__package__)
 
 DOMAIN = "solectrus_integration"
 
+FORECAST_SENSOR_KEYS: Final[set[str]] = {
+    "INVERTER_POWER_FORECAST_CLEARSKY",
+    "INVERTER_POWER_FORECAST",
+    "OUTDOOR_TEMP_FORECAST",
+}
+
 CONF_URL: Final = "url"
 CONF_TOKEN: Final = "token"  # noqa: S105
 CONF_ORG: Final = "org"
