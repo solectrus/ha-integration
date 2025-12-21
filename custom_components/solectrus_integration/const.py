@@ -52,6 +52,9 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     "INVERTER_POWER_FORECAST": SensorDefinition(
         "inverter_forecast", "power", DATA_TYPE_INT
     ),
+    "INVERTER_POWER_FORECAST_CLEARSKY": SensorDefinition(
+        "inverter_forecast_clearsky", "power", DATA_TYPE_INT
+    ),
     "HOUSE_POWER": SensorDefinition("house", "power", DATA_TYPE_INT),
     "BATTERY_SOC": SensorDefinition("battery", "soc", DATA_TYPE_FLOAT),
     "BATTERY_CHARGING_POWER": SensorDefinition(
