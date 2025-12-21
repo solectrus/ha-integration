@@ -18,6 +18,7 @@ from .const import (
     CONF_SENSORS,
     CONF_TOKEN,
     CONF_URL,
+    CONF_VERIFY_SSL,
     DATA_TYPE_OPTIONS,
     DOMAIN,
     LOGGER,
@@ -54,6 +55,7 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 token=user_input[CONF_TOKEN],
                 org=user_input[CONF_ORG],
                 bucket=user_input[CONF_BUCKET],
+                verify_ssl=user_input.get(CONF_VERIFY_SSL, True),
             )
             try:
                 await client.async_validate_connection()
@@ -94,6 +96,7 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 token=user_input[CONF_TOKEN],
                 org=user_input[CONF_ORG],
                 bucket=user_input[CONF_BUCKET],
+                verify_ssl=user_input.get(CONF_VERIFY_SSL, True),
             )
             try:
                 await client.async_validate_connection()
@@ -227,6 +230,10 @@ def _influx_schema(defaults: dict) -> vol.Schema:
                     type=selector.TextSelectorType.TEXT,
                 ),
             ),
+            vol.Optional(
+                CONF_VERIFY_SSL,
+                default=defaults.get(CONF_VERIFY_SSL, True),
+            ): selector.BooleanSelector(selector.BooleanSelectorConfig()),
         }
     )
 

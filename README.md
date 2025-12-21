@@ -68,5 +68,5 @@ Once configured, the integration listens for entity state changes and writes the
 ## Troubleshooting
 
 - **Setup error “Bucket not found or token lacks permission to read it”**: ensure the bucket exists and the token has permission to read bucket metadata (not only write).
-- **TLS/certificate errors**: `https://` connections verify certificates; use a valid cert/CA or use `http://` for local, non-TLS InfluxDB.
+- **TLS/certificate errors**: `https://` connections verify certificates; use a valid cert/CA, use `http://` for local non-TLS InfluxDB, or disable **Verify SSL certificate** (insecure).
 - **`field type conflict` in InfluxDB**: set the matching **Data type** in **Advanced options** to the field's existing type.

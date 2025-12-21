@@ -15,6 +15,7 @@ from .const import (
     CONF_SENSORS,
     CONF_TOKEN,
     CONF_URL,
+    CONF_VERIFY_SSL,
     SENSOR_DEFINITIONS,
 )
 from .data import SolectrusConfigEntry, SolectrusRuntimeData
@@ -37,6 +38,7 @@ async def async_setup_entry(
         token=entry.data[CONF_TOKEN],
         org=entry.data[CONF_ORG],
         bucket=entry.data[CONF_BUCKET],
+        verify_ssl=entry.data.get(CONF_VERIFY_SSL, True),
     )
 
     sensors = _build_sensor_map(entry)

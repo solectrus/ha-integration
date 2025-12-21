@@ -36,7 +36,9 @@ class SolectrusAuthError(SolectrusInfluxError):
 class SolectrusInfluxClient:
     """Thin wrapper around the sync InfluxDB client, executed off the event loop."""
 
-    def __init__(self, url: str, token: str, org: str, bucket: str) -> None:
+    def __init__(
+        self, url: str, token: str, org: str, bucket: str, *, verify_ssl: bool = True
+    ) -> None:
         """Create the Influx client wrapper."""
         self._url = url
         self._token = token
@@ -45,6 +47,7 @@ class SolectrusInfluxClient:
         self._client: InfluxDBClient | None = None
         self._write_api: WriteApi | None = None
         self._ssl = not url.lower().startswith("http://")
+        self._verify_ssl = bool(verify_ssl) and self._ssl
 
     async def async_validate_connection(self) -> None:
         """Validate connectivity, auth, and bucket access."""
@@ -161,15 +164,22 @@ class SolectrusInfluxClient:
         loop = asyncio.get_running_loop()
 
         def _build_client() -> InfluxDBClient:
-            ssl_param: bool | ssl.SSLContext = (
-                ssl.create_default_context() if self._ssl else False
-            )
+            ssl_param: bool | ssl.SSLContext
+            if not self._ssl:
+                ssl_param = False
+            elif self._verify_ssl:
+                ssl_param = ssl.create_default_context()
+            else:
+                insecure_context = ssl.create_default_context()
+                insecure_context.check_hostname = False
+                insecure_context.verify_mode = ssl.CERT_NONE
+                ssl_param = insecure_context
             return InfluxDBClient(
                 url=self._url,
                 token=self._token,
                 org=self._org,
                 ssl=ssl_param,
-                verify_ssl=self._ssl,
+                verify_ssl=self._verify_ssl,
             )
 
         try:

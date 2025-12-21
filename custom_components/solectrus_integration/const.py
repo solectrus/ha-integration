@@ -14,6 +14,7 @@ CONF_URL: Final = "url"
 CONF_TOKEN: Final = "token"  # noqa: S105
 CONF_ORG: Final = "org"
 CONF_BUCKET: Final = "bucket"
+CONF_VERIFY_SSL: Final = "verify_ssl"
 CONF_SENSORS: Final = "sensors"
 CONF_ENTITY_ID: Final = "entity_id"
 CONF_MEASUREMENT: Final = "measurement"
