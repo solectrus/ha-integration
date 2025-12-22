@@ -21,6 +21,7 @@ from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import FORECAST_SENSOR_KEYS, LOGGER
 
 BATCH_INTERVAL = timedelta(seconds=5)
+GAP_FILL_ZERO_RESUME_THRESHOLD = timedelta(seconds=30)
 
 BOOL_STRING_MAP: dict[str, bool] = {
     "on": True,
@@ -156,8 +157,24 @@ class SensorManager:
         if sensor.last_value == coerced and sensor.last_timestamp == timestamp:
             return
 
+        # Avoid long-gap interpolation artifacts:
+        # if we previously wrote 0 and nothing arrived for a while, then a positive
+        # value comes in, insert an extra 0 point 1s before the new value.
+        should_gap_fill = False
+        if (
+            sensor.last_timestamp is not None
+            and isinstance(sensor.last_value, (int, float))
+            and sensor.last_value == 0
+            and isinstance(coerced, (int, float))
+            and coerced > 0
+        ):
+            gap = dt_util.as_utc(timestamp) - dt_util.as_utc(sensor.last_timestamp)
+            should_gap_fill = gap >= GAP_FILL_ZERO_RESUME_THRESHOLD
+
         sensor.last_value = coerced
         sensor.last_timestamp = timestamp
+        if should_gap_fill:
+            self._queue_point(sensor, 0, timestamp=timestamp - timedelta(seconds=1))
         self._queue_point(sensor, coerced, timestamp=timestamp)
 
     def _queue_point(
