@@ -8,7 +8,7 @@ This custom integration forwards Home Assistant entity values into an InfluxDB b
 
 - Configure InfluxDB URL, token, organisation, and bucket directly in the config flow.
 - Map every SOLECTRUS sensor to a Home Assistant entity via the options flow; measurement/field defaults are pre-filled but can be overridden.
-- Writes are throttled to no more than once every 5 seconds per sensor and at least once every 5 minutes (last known value), skipping repeated zero values.
+- Writes are batched and sent every 5 seconds; points are deduplicated by `(sensor, timestamp)` (value may repeat).
 
 ## Requirements
 

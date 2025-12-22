@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -55,6 +55,7 @@ class ConfiguredSensor:
     field: str
     data_type: str
     last_value: Any | None = None
+    last_timestamp: datetime | None = None
 
 
 @dataclass
@@ -92,8 +93,15 @@ class SensorManager:
             current_state = self._hass.states.get(sensor.entity_id)
             value = self._state_to_value(current_state)
             if value is not None:
-                sensor.last_value = value
-                self._queue_point(sensor, value)
+                timestamp = self._normalize_timestamp(
+                    self._state_to_timestamp(current_state) or dt_util.utcnow()
+                )
+                coerced = self._coerce_value(value, sensor.data_type)
+                if coerced is None:
+                    continue
+                sensor.last_value = coerced
+                sensor.last_timestamp = timestamp
+                self._queue_point(sensor, coerced, timestamp=timestamp)
 
         entity_ids = [sensor.entity_id for sensor in self._sensors.values()]
         if entity_ids:
@@ -137,8 +145,20 @@ class SensorManager:
         if value is None:
             return
 
-        sensor.last_value = value
-        self._queue_point(sensor, value)
+        timestamp = self._normalize_timestamp(
+            self._state_to_timestamp(new_state) or dt_util.utcnow()
+        )
+        coerced = self._coerce_value(value, sensor.data_type)
+        if coerced is None:
+            return
+
+        # Only skip if both value and timestamp are unchanged.
+        if sensor.last_value == coerced and sensor.last_timestamp == timestamp:
+            return
+
+        sensor.last_value = coerced
+        sensor.last_timestamp = timestamp
+        self._queue_point(sensor, coerced, timestamp=timestamp)
 
     def _queue_point(
         self,
@@ -153,10 +173,13 @@ class SensorManager:
         if coerced is None:
             return
 
-        self._pending[pending_key or sensor.key] = PendingPoint(
+        normalized_timestamp = self._normalize_timestamp(timestamp or dt_util.utcnow())
+        self._pending[
+            pending_key or f"{sensor.key}:{normalized_timestamp.isoformat()}"
+        ] = PendingPoint(
             sensor=sensor,
             value=coerced,
-            timestamp=timestamp or dt_util.utcnow(),
+            timestamp=normalized_timestamp,
         )
 
     async def _queue_forecast_points(
@@ -180,11 +203,12 @@ class SensorManager:
             )
 
         for timestamp, value in sorted(series, key=lambda pair: pair[0]):
+            normalized_timestamp = self._normalize_timestamp(timestamp)
             self._queue_point(
                 sensor,
                 value,
-                timestamp=timestamp,
-                pending_key=f"{sensor.key}:{timestamp.isoformat()}",
+                timestamp=normalized_timestamp,
+                pending_key=f"{sensor.key}:{normalized_timestamp.isoformat()}",
             )
 
     async def _weather_temperature_series(
@@ -307,6 +331,48 @@ class SensorManager:
             return None
 
         return coerced
+
+    @staticmethod
+    def _normalize_timestamp(timestamp: datetime) -> datetime:
+        """Normalize timestamps to match the write precision (seconds)."""
+        return dt_util.as_utc(timestamp).replace(microsecond=0)
+
+    @staticmethod
+    def _state_to_timestamp(state: State | None) -> datetime | None:
+        """Extract a timestamp from a state (attributes preferred)."""
+        if state is None:
+            return None
+
+        # Prefer explicit source timestamps provided via state attributes.
+        for key in (
+            "timestamp",
+            "time",
+            "datetime",
+            "period_end",
+            "last_update",
+            "last_updated",
+        ):
+            raw = state.attributes.get(key)
+            if raw is None:
+                continue
+
+            if isinstance(raw, datetime):
+                return dt_util.as_utc(raw)
+
+            if isinstance(raw, (int, float)):
+                # Heuristic: treat large values as milliseconds since epoch.
+                seconds = float(raw) / 1000 if raw > 10**12 else float(raw)
+                try:
+                    return datetime.fromtimestamp(seconds, tz=UTC)
+                except (OverflowError, OSError, ValueError):
+                    continue
+
+            if isinstance(raw, str):
+                parsed = dt_util.parse_datetime(raw)
+                if parsed is not None:
+                    return dt_util.as_utc(parsed)
+
+        return dt_util.as_utc(state.last_updated)
 
     @staticmethod
     def _state_to_value(state: State | None) -> Any | None:
