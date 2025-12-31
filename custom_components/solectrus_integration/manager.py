@@ -21,6 +21,7 @@ from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import FORECAST_SENSOR_KEYS, LOGGER
 
 BATCH_INTERVAL = timedelta(seconds=5)
+HEARTBEAT_INTERVAL = timedelta(minutes=5)
 GAP_FILL_ZERO_RESUME_THRESHOLD = timedelta(seconds=30)
 
 BOOL_STRING_MAP: dict[str, bool] = {
@@ -83,6 +84,7 @@ class SensorManager:
         self._sensors = sensors
         self._unsub_state = None
         self._unsub_batch = None
+        self._unsub_heartbeat = None
         self._pending: dict[str, PendingPoint] = {}
 
     async def async_start(self) -> None:
@@ -114,6 +116,9 @@ class SensorManager:
         self._unsub_batch = async_track_time_interval(
             self._hass, self._flush_batch, BATCH_INTERVAL
         )
+        self._unsub_heartbeat = async_track_time_interval(
+            self._hass, self._heartbeat, HEARTBEAT_INTERVAL
+        )
 
         # Send initial batch immediately
         await self._flush_batch(dt_util.utcnow())
@@ -126,6 +131,9 @@ class SensorManager:
         if self._unsub_batch:
             self._unsub_batch()
             self._unsub_batch = None
+        if self._unsub_heartbeat:
+            self._unsub_heartbeat()
+            self._unsub_heartbeat = None
         # Flush remaining points
         if self._pending:
             await self._flush_batch(dt_util.utcnow())
@@ -176,6 +184,32 @@ class SensorManager:
         if should_gap_fill:
             self._queue_point(sensor, 0, timestamp=timestamp - timedelta(seconds=1))
         self._queue_point(sensor, coerced, timestamp=timestamp)
+
+    def _heartbeat(self, _now: datetime) -> None:
+        """
+        Periodically re-queue all current sensor values.
+
+        This ensures continuous data points in InfluxDB even for sensors
+        that remain unchanged (e.g., constantly reporting 0).
+        """
+        timestamp = self._normalize_timestamp(dt_util.utcnow())
+
+        for sensor in self._sensors.values():
+            if sensor.key in FORECAST_SENSOR_KEYS:
+                continue
+
+            current_state = self._hass.states.get(sensor.entity_id)
+            value = self._state_to_value(current_state)
+            if value is None:
+                continue
+
+            coerced = self._coerce_value(value, sensor.data_type)
+            if coerced is None:
+                continue
+
+            sensor.last_value = coerced
+            sensor.last_timestamp = timestamp
+            self._queue_point(sensor, coerced, timestamp=timestamp)
 
     def _queue_point(
         self,
