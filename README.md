@@ -13,7 +13,7 @@ This custom integration forwards Home Assistant entity values into an InfluxDB b
 
 ## Requirements
 
-- Home Assistant `2025.9.4` or newer
+- Home Assistant `2024.6` or newer
 - InfluxDB 2.x reachable from Home Assistant (URL + org + bucket + token)
 - An InfluxDB token that can:
   - read bucket metadata (bucket lookup during setup)
