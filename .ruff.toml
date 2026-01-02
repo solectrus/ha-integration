@@ -26,3 +26,13 @@ keep-runtime-typing = true
 
 [lint.mccabe]
 max-complexity = 25
+
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # assert allowed in tests
+    "ANN",     # no type annotations required in tests
+    "D",       # no docstrings required in tests
+    "PLR2004", # magic values allowed in tests
+    "SLF001",  # private member access allowed in tests
+    "FBT",     # boolean positional args allowed in tests
+]
