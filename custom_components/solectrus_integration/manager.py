@@ -37,7 +37,7 @@ BOOL_STRING_MAP: dict[str, bool] = {
 
 
 def _coerce_int(value: Any) -> int:
-    return int(float(value))
+    return round(float(value))
 
 
 SIMPLE_CONVERTERS: dict[str, Any] = {
