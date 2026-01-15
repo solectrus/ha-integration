@@ -82,7 +82,6 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
     "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
     "CAR_BATTERY_SOC": SensorDefinition("car", "battery_soc", DATA_TYPE_FLOAT),
-    "CAR_MILEAGE": SensorDefinition("car", "mileage", DATA_TYPE_INT),
     "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
     "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
     "SYSTEM_STATUS_OK": SensorDefinition("system", "status_ok", DATA_TYPE_BOOL),
