@@ -70,6 +70,9 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
         "battery", "discharging_power", DATA_TYPE_INT
     ),
     "HEATPUMP_POWER": SensorDefinition("heatpump", "power", DATA_TYPE_INT),
+    "HEATPUMP_HEATING_POWER": SensorDefinition(
+        "heatpump", "heating_power", DATA_TYPE_INT
+    ),
     "HEATPUMP_TANK_TEMP": SensorDefinition("heatpump", "tank_temp", DATA_TYPE_FLOAT),
     "HEATPUMP_STATUS": SensorDefinition("heatpump", "status", DATA_TYPE_STRING),
     "OUTDOOR_TEMP_FORECAST": SensorDefinition(
