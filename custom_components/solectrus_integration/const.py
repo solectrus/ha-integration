@@ -75,9 +75,9 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     "OUTDOOR_TEMP_FORECAST": SensorDefinition(
         "outdoor_forecast", "temperature", DATA_TYPE_FLOAT
     ),
-    "GRID_POWER_EXPORT": SensorDefinition("grid", "export_power", DATA_TYPE_INT),
+    "GRID_EXPORT_POWER": SensorDefinition("grid", "export_power", DATA_TYPE_INT),
     "GRID_EXPORT_LIMIT": SensorDefinition("grid", "export_limit", DATA_TYPE_INT),
-    "GRID_POWER_IMPORT": SensorDefinition("grid", "import_power", DATA_TYPE_INT),
+    "GRID_IMPORT_POWER": SensorDefinition("grid", "import_power", DATA_TYPE_INT),
     "WALLBOX_POWER": SensorDefinition("wallbox", "power", DATA_TYPE_INT),
     "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
     "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
