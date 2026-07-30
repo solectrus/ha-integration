@@ -102,6 +102,15 @@ scripts/develop  # Start Home Assistant with the integration loaded
 - **TLS/certificate errors**: `https://` connections verify certificates; use a valid cert/CA, use `http://` for local non-TLS InfluxDB, or disable **Verify SSL certificate** (insecure).
 - **`field type conflict` in InfluxDB**: this should no longer happen, since the integration auto-detects the existing field type from InfluxDB on startup. If it does, check that the configured token has **read** access to the bucket — without read, the integration cannot inspect the schema and falls back to its built-in defaults, which may not match.
 
+### Sensor becomes `unknown`/`unavailable`
+
+No point is written for a mapped entity while its state is `unknown`, `unavailable`, or missing entirely - the last value already in InfluxDB simply stays the latest point until the entity reports again. A warning is logged once per outage (not repeated on every 5-minute heartbeat), and an info message once the entity recovers, e.g.:
+
+```
+WARNING ... INVERTER_POWER (sensor.inverter_power) is unavailable; no new points will be written until it reports a value again
+INFO    ... INVERTER_POWER (sensor.inverter_power) is reporting again
+```
+
 ### Debug logging
 
 To see exactly what the integration sends to InfluxDB, enable debug logging for it in `configuration.yaml` and restart Home Assistant:

@@ -99,6 +99,7 @@ class SensorManager:
         self._unsub_heartbeat = None
         self._pending: dict[str, PendingPoint] = {}
         self._warned_out_of_range: set[str] = set()
+        self._unavailable_sensors: set[str] = set()
 
     async def async_start(self) -> None:
         """Start listening for state updates."""
@@ -109,6 +110,7 @@ class SensorManager:
         # Queue initial values
         for sensor in self._sensors.values():
             current_state = self._hass.states.get(sensor.entity_id)
+            self._check_availability(sensor, current_state)
             if sensor.key in FORECAST_SENSOR_KEYS:
                 # Seed immediately from whatever the source already has,
                 # instead of waiting for its next state change - which, for
@@ -191,6 +193,42 @@ class SensorManager:
         if self._pending:
             await self._flush_batch(dt_util.utcnow())
 
+    def _check_availability(
+        self,
+        sensor: ConfiguredSensor,
+        state: State | None,
+    ) -> None:
+        """
+        Warn once when a sensor becomes unknown/unavailable/missing.
+
+        Also logs once when it starts reporting again, so outages are
+        visible in the log even though no points are written for them
+        (see _state_to_value).
+        """
+        if state is None:
+            status = "missing"
+        elif state.state == STATE_UNAVAILABLE:
+            status = "unavailable"
+        elif state.state == STATE_UNKNOWN:
+            status = "unknown"
+        else:
+            status = None
+
+        was_unavailable = sensor.key in self._unavailable_sensors
+        if status is not None:
+            if not was_unavailable:
+                self._unavailable_sensors.add(sensor.key)
+                LOGGER.warning(
+                    "%s (%s) is %s; no new points will be written until it "
+                    "reports a value again",
+                    sensor.key,
+                    sensor.entity_id,
+                    status,
+                )
+        elif was_unavailable:
+            self._unavailable_sensors.discard(sensor.key)
+            LOGGER.info("%s (%s) is reporting again", sensor.key, sensor.entity_id)
+
     async def _handle_state_change(self, event: Event) -> None:
         """Handle a new state."""
         entity_id = event.data["entity_id"]
@@ -199,6 +237,7 @@ class SensorManager:
             return
 
         new_state: State | None = event.data.get("new_state")
+        self._check_availability(sensor, new_state)
         if sensor.key in FORECAST_SENSOR_KEYS:
             await self._queue_forecast_points(sensor, new_state)
             return
@@ -252,6 +291,7 @@ class SensorManager:
                 continue
 
             current_state = self._hass.states.get(sensor.entity_id)
+            self._check_availability(sensor, current_state)
             value = self._state_to_value(current_state)
             if value is None:
                 continue

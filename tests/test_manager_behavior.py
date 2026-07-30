@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from influxdb_client import Point
 
 from custom_components.solectrus.api import SolectrusInfluxError
@@ -958,3 +959,149 @@ class TestValueRangeValidation:
         assert len(warning_messages) == 1
         assert "out of range" in warning_messages[0].message
         assert sensor.entity_id in warning_messages[0].message
+
+
+class TestCheckAvailability:
+    """Tests for _check_availability."""
+
+    def test_warns_when_state_missing(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, None)
+
+        warnings = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "missing" in warnings[0]
+        assert sensor.entity_id in warnings[0]
+        assert sensor.key in mgr._unavailable_sensors
+
+    def test_warns_when_unavailable(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        state = MagicMock(state=STATE_UNAVAILABLE)
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, state)
+
+        warnings = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "unavailable" in warnings[0]
+
+    def test_warns_when_unknown(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        state = MagicMock(state=STATE_UNKNOWN)
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, state)
+
+        warnings = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert "unknown" in warnings[0]
+
+    def test_no_warning_for_available_state(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        state = MagicMock(state="1500")
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, state)
+
+        assert not any(r.levelno == logging.WARNING for r in caplog.records)
+        assert sensor.key not in mgr._unavailable_sensors
+
+    def test_warns_only_once_while_still_unavailable(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        state = MagicMock(state=STATE_UNAVAILABLE)
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, state)
+            mgr._check_availability(sensor, state)
+            mgr._check_availability(sensor, state)
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+
+    def test_logs_recovery_once_available_again(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        unavailable = MagicMock(state=STATE_UNAVAILABLE)
+        recovered = MagicMock(state="1500")
+
+        with caplog.at_level(logging.INFO):
+            mgr._check_availability(sensor, unavailable)
+            mgr._check_availability(sensor, recovered)
+
+        info_messages = [r.message for r in caplog.records if r.levelno == logging.INFO]
+        assert len(info_messages) == 1
+        assert "reporting again" in info_messages[0]
+        assert sensor.key not in mgr._unavailable_sensors
+
+    def test_warns_again_after_recovering_and_dropping_again(self, caplog):
+        """Each new outage should be reported, not just the first ever one."""
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        unavailable = MagicMock(state=STATE_UNAVAILABLE)
+        recovered = MagicMock(state="1500")
+
+        with caplog.at_level(logging.WARNING):
+            mgr._check_availability(sensor, unavailable)
+            mgr._check_availability(sensor, recovered)
+            mgr._check_availability(sensor, unavailable)
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 2
+
+    @pytest.mark.asyncio
+    async def test_handle_state_change_warns_and_skips_point(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+
+        event = MagicMock()
+        event.data = {
+            "entity_id": sensor.entity_id,
+            "new_state": MagicMock(state=STATE_UNAVAILABLE),
+        }
+
+        with caplog.at_level(logging.WARNING):
+            await mgr._handle_state_change(event)
+
+        assert any(
+            r.levelno == logging.WARNING and "unavailable" in r.message
+            for r in caplog.records
+        )
+        assert len(mgr._pending) == 0
+
+    @pytest.mark.asyncio
+    async def test_handle_state_change_warns_for_forecast_sensor(self, caplog):
+        sensor = _sensor(key="INVERTER_POWER_FORECAST", entity_id="sensor.forecast")
+        mgr = _manager([sensor])
+
+        event = MagicMock()
+        event.data = {
+            "entity_id": sensor.entity_id,
+            "new_state": MagicMock(state=STATE_UNAVAILABLE, attributes={}),
+        }
+
+        with caplog.at_level(logging.WARNING):
+            await mgr._handle_state_change(event)
+
+        assert any(
+            r.levelno == logging.WARNING and "unavailable" in r.message
+            for r in caplog.records
+        )
+
+    def test_heartbeat_does_not_repeat_warning(self, caplog):
+        sensor = _sensor()
+        mgr = _manager([sensor])
+        mgr._hass.states.get.return_value = MagicMock(state=STATE_UNAVAILABLE)
+
+        with caplog.at_level(logging.WARNING):
+            mgr._heartbeat(FIXED_NOW)
+            mgr._heartbeat(FIXED_NOW)
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
