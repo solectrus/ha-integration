@@ -33,6 +33,9 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # Remove this 'ignore' key when the brand images PR has been merged:
+          # Permanently ignored: home-assistant/brands stopped accepting custom
+          # integrations in Feb 2026, which is why our PR was closed:
           # https://github.com/home-assistant/brands/pull/9850
+          # Since HA 2026.3 the brand images ship with the integration itself,
+          # see custom_components/solectrus/brand/.
           ignore: brands
