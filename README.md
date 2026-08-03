@@ -9,7 +9,10 @@ This custom integration forwards Home Assistant entity values into an InfluxDB b
 - Configure InfluxDB URL, token, organisation, and bucket directly in the config flow.
 - Map every SOLECTRUS sensor to a Home Assistant entity via the options flow; measurement/field defaults are pre-filled but can be overridden.
 - Writes are batched and sent every 5 seconds; points are deduplicated by `(sensor, timestamp)` (value may repeat).
-- When a sensor stayed at `0` for a longer time and then resumes with a positive value, the integration inserts an extra `0` point 1 second before the resume to avoid interpolation ramps.
+- Every 5 minutes a heartbeat re-writes the current value of each mapped entity, even if it never changed. This keeps a continuous series in InfluxDB for sensors that sit at the same value (e.g. a constant `0`). Forecast sensors are excluded.
+- Values outside a sensor's plausible range are discarded rather than written - see [Value range checks](#value-range-checks).
+- When a sensor stayed at `0` for at least 30 seconds and then resumes with a positive value, the integration inserts an extra `0` point 1 second before the resume to avoid interpolation ramps.
+- If InfluxDB is unreachable, points are buffered and retried with the next batch. The buffer holds up to 10,000 points; beyond that the oldest are dropped.
 - Forecast sensors (power, clear-sky power, outdoor temperature) are batched as full time series instead of a single point - see [Forecast sensors](#forecast-sensors).
 
 ## Requirements
@@ -59,6 +62,24 @@ The integration determines the InfluxDB field type for each (measurement, field)
 2. Otherwise, a curated default per sensor is used (`int` for power, `float` for SOC/temperatures, `bool` for connection states, `string` for status).
 
 If the incoming Home Assistant state cannot be converted to the resolved type, it is skipped.
+
+### Value range checks
+
+Most sensors have a plausible range attached. A value outside that range is **discarded, not written**, and a warning is logged once per sensor key:
+
+```
+WARNING ... Value -50 from sensor.grid_import is out of range (0..), discarded; check the sensor configuration in Home Assistant
+```
+
+The ranges are:
+
+- **Power sensors** (inverter, house, battery charging/discharging, heat pump, grid, wallbox, `CUSTOM_*`): minimum `0`. A sensor that reports negative values for the opposite direction of flow therefore needs a template sensor, or must be split into separate import/export entities.
+- **`BATTERY_SOC` and `CAR_BATTERY_SOC`**: `0` to `100`.
+- Temperatures, status strings, and booleans are unrestricted.
+
+### Custom sensors
+
+Besides the named keys there are 20 generic slots, `CUSTOM_01` to `CUSTOM_20`, shown as "Consumer 1" to "Consumer 20" in the options flow. They map to the measurements `custom_01` … `custom_20` with the field `power` and are meant for additional consumers your SOLECTRUS instance tracks.
 
 ### Advanced options
 
