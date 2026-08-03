@@ -29,9 +29,9 @@ You can enter the URL with or without a scheme:
 
 ### HACS
 
-1. HACS → **Integrations** → **⋮** → **Custom repositories**
+1. Open **HACS** and choose **⋮** (top right) → **Custom repositories**
 2. Add `https://github.com/solectrus/ha-integration` as type **Integration**
-3. Install **SOLECTRUS**
+3. Search for **SOLECTRUS** in HACS and choose **Download**
 4. Restart Home Assistant
 
 ### Manual
