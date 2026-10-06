@@ -1,6 +1,6 @@
 {
   "name": "solectrus/ha-integration",
-  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "image": "mcr.microsoft.com/devcontainers/python:3.14",
   "postCreateCommand": "scripts/setup",
   "forwardPorts": [8123],
   "portsAttributes": {
