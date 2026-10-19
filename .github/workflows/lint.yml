@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# A new push to the same branch cancels the run of the previous one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ruff:
     name: "Ruff"
