@@ -5,10 +5,13 @@ from __future__ import annotations
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import selector
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import (
+    CAR_COUNT,
+    CAR_SENSOR_NUMBERS,
     CONF_BUCKET,
     CONF_ENTITY_ID,
     CONF_FIELD,
@@ -21,6 +24,7 @@ from .const import (
     DOMAIN,
     LOGGER,
     SENSOR_DEFINITIONS,
+    SensorDefinition,
 )
 
 
@@ -235,53 +239,91 @@ def _influx_schema(defaults: dict) -> vol.Schema:
 
 def _build_sensors_schema(existing_sensors: dict, *, show_advanced: bool) -> dict:
     schema_dict: dict = {}
+    mapped_cars: set[int] = set()
 
     for key, definition in SENSOR_DEFINITIONS.items():
         configured = existing_sensors.get(key, {})
-        schema_dict[
-            vol.Optional(
-                f"{key}_entity",
-                description={
-                    "suggested_value": configured.get(CONF_ENTITY_ID),
-                },
-            )
-        ] = selector.EntitySelector(selector.EntitySelectorConfig())
-        if show_advanced:
-            schema_dict[
-                vol.Optional(
-                    f"{key}_measurement",
-                    default=configured.get(CONF_MEASUREMENT, definition.measurement),
-                )
-            ] = selector.TextSelector(
-                selector.TextSelectorConfig(
-                    type=selector.TextSelectorType.TEXT,
-                )
-            )
-            schema_dict[
-                vol.Optional(
-                    f"{key}_field",
-                    default=configured.get(CONF_FIELD, definition.field),
-                )
-            ] = selector.TextSelector(
-                selector.TextSelectorConfig(
-                    type=selector.TextSelectorType.TEXT,
-                )
-            )
+        fields = _sensor_fields(
+            key, definition, configured, show_advanced=show_advanced
+        )
+        number = CAR_SENSOR_NUMBERS.get(key)
+        if number is None:
+            schema_dict.update(fields)
+            continue
+        # Collect the fields of each car where its first sensor is.
+        schema_dict.setdefault(vol.Required(f"car_{number}"), {}).update(fields)
+        if configured.get(CONF_ENTITY_ID):
+            mapped_cars.add(number)
+
+    # Turn the collected fields into sections, collapsed while no sensor of
+    # the car is mapped.
+    for number in range(1, CAR_COUNT + 1):
+        key = f"car_{number}"
+        schema_dict[key] = section(
+            vol.Schema(schema_dict[key]), {"collapsed": number not in mapped_cars}
+        )
     return schema_dict
+
+
+def _sensor_fields(
+    key: str,
+    definition: SensorDefinition,
+    configured: dict,
+    *,
+    show_advanced: bool,
+) -> dict:
+    fields: dict = {
+        vol.Optional(
+            f"{key}_entity",
+            description={
+                "suggested_value": configured.get(CONF_ENTITY_ID),
+            },
+        ): selector.EntitySelector(selector.EntitySelectorConfig())
+    }
+    if show_advanced:
+        fields[
+            vol.Optional(
+                f"{key}_measurement",
+                default=configured.get(CONF_MEASUREMENT, definition.measurement),
+            )
+        ] = selector.TextSelector(
+            selector.TextSelectorConfig(
+                type=selector.TextSelectorType.TEXT,
+            )
+        )
+        fields[
+            vol.Optional(
+                f"{key}_field",
+                default=configured.get(CONF_FIELD, definition.field),
+            )
+        ] = selector.TextSelector(
+            selector.TextSelectorConfig(
+                type=selector.TextSelectorType.TEXT,
+            )
+        )
+    return fields
 
 
 def _parse_sensors_input(
     user_input: dict, existing_sensors: dict, *, show_advanced: bool
 ) -> dict[str, dict[str, str]]:
+    # Lift the fields of the car sections to the top level.
+    flat_input: dict = {}
+    for name, value in user_input.items():
+        if isinstance(value, dict):
+            flat_input.update(value)
+        else:
+            flat_input[name] = value
+
     sensors: dict[str, dict[str, str]] = {}
     for key, definition in SENSOR_DEFINITIONS.items():
         configured = existing_sensors.get(key, {})
-        entity_id = user_input.get(f"{key}_entity")
+        entity_id = flat_input.get(f"{key}_entity")
         measurement = configured.get(CONF_MEASUREMENT, definition.measurement)
         field = configured.get(CONF_FIELD, definition.field)
         if show_advanced:
-            measurement = user_input.get(f"{key}_measurement") or measurement
-            field = user_input.get(f"{key}_field") or field
+            measurement = flat_input.get(f"{key}_measurement") or measurement
+            field = flat_input.get(f"{key}_field") or field
         if entity_id:
             sensors[key] = {
                 CONF_ENTITY_ID: entity_id,

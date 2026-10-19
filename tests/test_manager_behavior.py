@@ -42,7 +42,7 @@ def _manager(sensors=None, client=None) -> SensorManager:
     sensor_map = {}
     if sensors:
         for s in sensors:
-            sensor_map[s.entity_id] = s
+            sensor_map[s.key] = s
     return SensorManager(hass, client, sensor_map)
 
 
@@ -413,6 +413,58 @@ class TestHandleStateChange:
         assert len(mgr._pending) == 1
 
     @pytest.mark.asyncio
+    async def test_car_sensor_has_no_gap_fill(self):
+        sensor = _sensor(
+            key="CAR_RANGE", measurement="car", field="range", data_type="float"
+        )
+        sensor.last_value = 0.0
+        sensor.last_timestamp = FIXED_NOW - timedelta(hours=5)
+        mgr = _manager([sensor])
+
+        event = self._make_event("sensor.inverter_power", 250.0)
+        await mgr._handle_state_change(event)
+
+        assert [p.value for p in mgr._pending.values()] == [250.0]
+
+    @pytest.mark.asyncio
+    async def test_car_sensor_writes_each_update(self):
+        # An update of Home Assistant with the same value is a real reading
+        sensor = _sensor(
+            key="CAR_BATTERY_SOC",
+            measurement="car",
+            field="battery_soc",
+            data_type="float",
+        )
+        sensor.last_value = 64.0
+        sensor.last_timestamp = FIXED_NOW - timedelta(minutes=30)
+        mgr = _manager([sensor])
+
+        event = self._make_event("sensor.inverter_power", 64.0)
+        await mgr._handle_state_change(event)
+
+        assert [p.timestamp for p in mgr._pending.values()] == [FIXED_NOW]
+
+    @pytest.mark.asyncio
+    async def test_car_position_from_device_tracker(self):
+        sensor = _sensor(
+            key="CAR_LATITUDE",
+            entity_id="device_tracker.zoe",
+            measurement="car",
+            field="latitude",
+            data_type="float",
+            attribute="latitude",
+        )
+        sensor.last_value = 48.1
+        mgr = _manager([sensor])
+
+        # The car moves, the state stays "home"
+        event = self._make_event("device_tracker.zoe", "home")
+        event.data["new_state"].attributes = {"latitude": 48.2, "longitude": 11.5}
+        await mgr._handle_state_change(event)
+
+        assert [p.value for p in mgr._pending.values()] == [48.2]
+
+    @pytest.mark.asyncio
     async def test_forecast_sensor_delegates(self):
         sensor = _sensor(key="INVERTER_POWER_FORECAST", entity_id="sensor.forecast")
         mgr = _manager([sensor])
@@ -587,6 +639,84 @@ class TestHeartbeat:
             mgr._heartbeat(FIXED_NOW)
 
         assert len(mgr._pending) == 2
+
+
+class TestSharedEntity:
+    """One entity feeds several sensors, like a device_tracker for the position."""
+
+    def _position_sensors(self) -> list[ConfiguredSensor]:
+        return [
+            _sensor(
+                key=f"CAR_{axis.upper()}",
+                entity_id="device_tracker.zoe",
+                measurement="car",
+                field=axis,
+                data_type="float",
+                attribute=axis,
+            )
+            for axis in ("latitude", "longitude")
+        ]
+
+    def _tracker_state(self, latitude, longitude, last_updated=FIXED_NOW):
+        state = MagicMock()
+        state.state = "home"
+        state.attributes = {"latitude": latitude, "longitude": longitude}
+        state.last_updated = last_updated
+        return state
+
+    async def _written_lines(self, mgr) -> list[str]:
+        await mgr._flush_batch(FIXED_NOW)
+        points = mgr._client.async_write_batch.call_args.args[0]
+        return sorted(point.to_line_protocol() for point in points)
+
+    @pytest.mark.asyncio
+    async def test_event_writes_latitude_and_longitude(self):
+        mgr = _manager(self._position_sensors())
+
+        event = MagicMock()
+        event.data = {
+            "entity_id": "device_tracker.zoe",
+            "new_state": self._tracker_state(50.92264, 6.40709),
+        }
+        await mgr._handle_state_change(event)
+
+        ts = int(FIXED_NOW.timestamp())
+        assert await self._written_lines(mgr) == [
+            f"car latitude=50.92264 {ts}",
+            f"car longitude=6.40709 {ts}",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_start_tracks_entity_once_and_writes_both(self):
+        mgr = _manager(self._position_sensors())
+        mgr._hass.states.get.return_value = self._tracker_state(50.92264, 6.40709)
+
+        with (
+            patch(
+                "custom_components.solectrus.manager.async_track_state_change_event"
+            ) as mock_track_state,
+            patch("custom_components.solectrus.manager.async_track_time_interval"),
+        ):
+            await mgr.async_start()
+
+        assert mock_track_state.call_args.args[1] == ["device_tracker.zoe"]
+        points = mgr._client.async_write_batch.call_args.args[0]
+        assert sorted(p.to_line_protocol().split()[1] for p in points) == [
+            "latitude=50.92264",
+            "longitude=6.40709",
+        ]
+
+    def test_heartbeat_skips_car_sensors(self):
+        mgr = _manager(self._position_sensors())
+        mgr._hass.states.get.return_value = self._tracker_state(50.92264, 6.40709)
+
+        with patch(
+            "custom_components.solectrus.manager.dt_util.utcnow",
+            return_value=FIXED_NOW,
+        ):
+            mgr._heartbeat(FIXED_NOW)
+
+        assert len(mgr._pending) == 0
 
 
 class TestAsyncStartStop:

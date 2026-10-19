@@ -113,9 +113,6 @@
           "CASE_TEMP_entity": "Gehäusetemperatur",
           "CASE_TEMP_measurement": "↳ Measurement",
           "CASE_TEMP_field": "↳ Field",
-          "CAR_BATTERY_SOC_entity": "Fahrzeug-Ladestand",
-          "CAR_BATTERY_SOC_measurement": "↳ Measurement",
-          "CAR_BATTERY_SOC_field": "↳ Field",
           "OUTDOOR_TEMP_entity": "Außentemperatur",
           "OUTDOOR_TEMP_measurement": "↳ Measurement",
           "OUTDOOR_TEMP_field": "↳ Field",
@@ -185,6 +182,123 @@
           "CUSTOM_20_entity": "Verbraucher 20",
           "CUSTOM_20_measurement": "↳ Measurement",
           "CUSTOM_20_field": "↳ Field"
+        },
+        "sections": {
+          "car_1": {
+            "name": "E-Auto 1",
+            "data": {
+              "CAR_BATTERY_SOC_entity": "Ladestand",
+              "CAR_BATTERY_SOC_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_field": "↳ Field",
+              "CAR_ODOMETER_entity": "Kilometerstand",
+              "CAR_ODOMETER_measurement": "↳ Measurement",
+              "CAR_ODOMETER_field": "↳ Field",
+              "CAR_RANGE_entity": "Reichweite",
+              "CAR_RANGE_measurement": "↳ Measurement",
+              "CAR_RANGE_field": "↳ Field",
+              "CAR_CONNECTED_entity": "Angeschlossen",
+              "CAR_CONNECTED_measurement": "↳ Measurement",
+              "CAR_CONNECTED_field": "↳ Field",
+              "CAR_LATITUDE_entity": "Breitengrad",
+              "CAR_LATITUDE_measurement": "↳ Measurement",
+              "CAR_LATITUDE_field": "↳ Field",
+              "CAR_LONGITUDE_entity": "Längengrad",
+              "CAR_LONGITUDE_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_field": "↳ Field"
+            }
+          },
+          "car_2": {
+            "name": "E-Auto 2",
+            "data": {
+              "CAR_BATTERY_SOC_2_entity": "Ladestand",
+              "CAR_BATTERY_SOC_2_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_2_field": "↳ Field",
+              "CAR_ODOMETER_2_entity": "Kilometerstand",
+              "CAR_ODOMETER_2_measurement": "↳ Measurement",
+              "CAR_ODOMETER_2_field": "↳ Field",
+              "CAR_RANGE_2_entity": "Reichweite",
+              "CAR_RANGE_2_measurement": "↳ Measurement",
+              "CAR_RANGE_2_field": "↳ Field",
+              "CAR_CONNECTED_2_entity": "Angeschlossen",
+              "CAR_CONNECTED_2_measurement": "↳ Measurement",
+              "CAR_CONNECTED_2_field": "↳ Field",
+              "CAR_LATITUDE_2_entity": "Breitengrad",
+              "CAR_LATITUDE_2_measurement": "↳ Measurement",
+              "CAR_LATITUDE_2_field": "↳ Field",
+              "CAR_LONGITUDE_2_entity": "Längengrad",
+              "CAR_LONGITUDE_2_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_2_field": "↳ Field"
+            }
+          },
+          "car_3": {
+            "name": "E-Auto 3",
+            "data": {
+              "CAR_BATTERY_SOC_3_entity": "Ladestand",
+              "CAR_BATTERY_SOC_3_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_3_field": "↳ Field",
+              "CAR_ODOMETER_3_entity": "Kilometerstand",
+              "CAR_ODOMETER_3_measurement": "↳ Measurement",
+              "CAR_ODOMETER_3_field": "↳ Field",
+              "CAR_RANGE_3_entity": "Reichweite",
+              "CAR_RANGE_3_measurement": "↳ Measurement",
+              "CAR_RANGE_3_field": "↳ Field",
+              "CAR_CONNECTED_3_entity": "Angeschlossen",
+              "CAR_CONNECTED_3_measurement": "↳ Measurement",
+              "CAR_CONNECTED_3_field": "↳ Field",
+              "CAR_LATITUDE_3_entity": "Breitengrad",
+              "CAR_LATITUDE_3_measurement": "↳ Measurement",
+              "CAR_LATITUDE_3_field": "↳ Field",
+              "CAR_LONGITUDE_3_entity": "Längengrad",
+              "CAR_LONGITUDE_3_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_3_field": "↳ Field"
+            }
+          },
+          "car_4": {
+            "name": "E-Auto 4",
+            "data": {
+              "CAR_BATTERY_SOC_4_entity": "Ladestand",
+              "CAR_BATTERY_SOC_4_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_4_field": "↳ Field",
+              "CAR_ODOMETER_4_entity": "Kilometerstand",
+              "CAR_ODOMETER_4_measurement": "↳ Measurement",
+              "CAR_ODOMETER_4_field": "↳ Field",
+              "CAR_RANGE_4_entity": "Reichweite",
+              "CAR_RANGE_4_measurement": "↳ Measurement",
+              "CAR_RANGE_4_field": "↳ Field",
+              "CAR_CONNECTED_4_entity": "Angeschlossen",
+              "CAR_CONNECTED_4_measurement": "↳ Measurement",
+              "CAR_CONNECTED_4_field": "↳ Field",
+              "CAR_LATITUDE_4_entity": "Breitengrad",
+              "CAR_LATITUDE_4_measurement": "↳ Measurement",
+              "CAR_LATITUDE_4_field": "↳ Field",
+              "CAR_LONGITUDE_4_entity": "Längengrad",
+              "CAR_LONGITUDE_4_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_4_field": "↳ Field"
+            }
+          },
+          "car_5": {
+            "name": "E-Auto 5",
+            "data": {
+              "CAR_BATTERY_SOC_5_entity": "Ladestand",
+              "CAR_BATTERY_SOC_5_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_5_field": "↳ Field",
+              "CAR_ODOMETER_5_entity": "Kilometerstand",
+              "CAR_ODOMETER_5_measurement": "↳ Measurement",
+              "CAR_ODOMETER_5_field": "↳ Field",
+              "CAR_RANGE_5_entity": "Reichweite",
+              "CAR_RANGE_5_measurement": "↳ Measurement",
+              "CAR_RANGE_5_field": "↳ Field",
+              "CAR_CONNECTED_5_entity": "Angeschlossen",
+              "CAR_CONNECTED_5_measurement": "↳ Measurement",
+              "CAR_CONNECTED_5_field": "↳ Field",
+              "CAR_LATITUDE_5_entity": "Breitengrad",
+              "CAR_LATITUDE_5_measurement": "↳ Measurement",
+              "CAR_LATITUDE_5_field": "↳ Field",
+              "CAR_LONGITUDE_5_entity": "Längengrad",
+              "CAR_LONGITUDE_5_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_5_field": "↳ Field"
+            }
+          }
         }
       }
     }

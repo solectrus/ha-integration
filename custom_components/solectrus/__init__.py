@@ -81,7 +81,7 @@ async def async_reload_entry(
 
 
 def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor]:
-    """Create ConfiguredSensor objects keyed by entity_id."""
+    """Create ConfiguredSensor objects keyed by SOLECTRUS sensor key."""
     sensors: dict[str, ConfiguredSensor] = {}
     configured_sensors: dict = entry.options.get(CONF_SENSORS, {})
 
@@ -97,7 +97,7 @@ def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor
 
         measurement = settings.get(CONF_MEASUREMENT, defaults.measurement)
         field = settings.get(CONF_FIELD, defaults.field)
-        sensors[entity_id] = ConfiguredSensor(
+        sensors[key] = ConfiguredSensor(
             key=key,
             entity_id=entity_id,
             measurement=measurement,
@@ -105,6 +105,7 @@ def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor
             data_type=defaults.data_type,
             min_value=defaults.min_value,
             max_value=defaults.max_value,
+            attribute=defaults.attribute,
         )
 
     return sensors

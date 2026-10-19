@@ -45,8 +45,8 @@ class TestBuildSensorMap:
         result = _build_sensor_map(mock_entry)
 
         assert len(result) == 1
-        assert "sensor.inverter_power" in result
-        sensor = result["sensor.inverter_power"]
+        assert "INVERTER_POWER" in result
+        sensor = result["INVERTER_POWER"]
         assert isinstance(sensor, ConfiguredSensor)
         assert sensor.key == "INVERTER_POWER"
         assert sensor.entity_id == "sensor.inverter_power"
@@ -90,7 +90,7 @@ class TestBuildSensorMap:
 
         result = _build_sensor_map(mock_entry)
 
-        sensor = result["sensor.my_inverter"]
+        sensor = result["INVERTER_POWER"]
         assert sensor.measurement == "custom_measurement"
         assert sensor.field == "custom_field"
 
@@ -107,11 +107,41 @@ class TestBuildSensorMap:
 
         result = _build_sensor_map(mock_entry)
 
-        sensor = result["sensor.inverter_power"]
+        sensor = result["INVERTER_POWER"]
         assert sensor.measurement == "inverter"
         assert sensor.field == "power"
         # data_type seeded from fallback; the manager replaces it on startup.
         assert sensor.data_type == "int"
+
+    def test_build_sensor_map_sets_attribute_for_car_position(self):
+        mock_entry = MagicMock()
+        mock_entry.options = {
+            CONF_SENSORS: {
+                "CAR_LATITUDE_2": {CONF_ENTITY_ID: "device_tracker.car_2"},
+                "CAR_BATTERY_SOC_2": {CONF_ENTITY_ID: "sensor.car_2_soc"},
+            },
+        }
+
+        result = _build_sensor_map(mock_entry)
+
+        assert result["CAR_LATITUDE_2"].attribute == "latitude"
+        assert result["CAR_LATITUDE_2"].measurement == "car_2"
+        assert result["CAR_BATTERY_SOC_2"].attribute is None
+
+    def test_build_sensor_map_keeps_both_sensors_of_one_entity(self):
+        mock_entry = MagicMock()
+        mock_entry.options = {
+            CONF_SENSORS: {
+                "CAR_LATITUDE": {CONF_ENTITY_ID: "device_tracker.zoe"},
+                "CAR_LONGITUDE": {CONF_ENTITY_ID: "device_tracker.zoe"},
+            },
+        }
+
+        result = _build_sensor_map(mock_entry)
+
+        assert set(result) == {"CAR_LATITUDE", "CAR_LONGITUDE"}
+        assert result["CAR_LATITUDE"].attribute == "latitude"
+        assert result["CAR_LONGITUDE"].attribute == "longitude"
 
     def test_build_sensor_map_skips_unknown_sensor(self):
         """Unknown sensor keys are skipped (only SENSOR_DEFINITIONS keys are valid)."""

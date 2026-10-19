@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import (
+    CAR_SENSOR_NUMBERS,
     DATA_TYPE_BOOL,
     DATA_TYPE_FLOAT,
     DATA_TYPE_INT,
@@ -68,6 +69,7 @@ class ConfiguredSensor:
     data_type: str
     min_value: float | None = None
     max_value: float | None = None
+    attribute: str | None = None
     last_value: Any | None = None
     last_timestamp: datetime | None = None
 
@@ -90,10 +92,15 @@ class SensorManager:
         client: SolectrusInfluxClient,
         sensors: dict[str, ConfiguredSensor],
     ) -> None:
-        """Initialize the manager."""
+        """Initialize the manager with the sensors keyed by SOLECTRUS key."""
         self._hass = hass
         self._client = client
         self._sensors = sensors
+        # One entity can feed several sensors, for example a device_tracker
+        # for CAR_LATITUDE and CAR_LONGITUDE.
+        self._sensors_by_entity: dict[str, list[ConfiguredSensor]] = {}
+        for sensor in sensors.values():
+            self._sensors_by_entity.setdefault(sensor.entity_id, []).append(sensor)
         self._unsub_state = None
         self._unsub_batch = None
         self._unsub_heartbeat = None
@@ -118,7 +125,7 @@ class SensorManager:
                 # for a long time after every HA/integration restart.
                 await self._queue_forecast_points(sensor, current_state)
                 continue
-            value = self._state_to_value(current_state)
+            value = self._state_to_value(current_state, sensor.attribute)
             if value is not None:
                 timestamp = self._normalize_timestamp(
                     self._state_to_timestamp(current_state) or dt_util.utcnow()
@@ -130,11 +137,10 @@ class SensorManager:
                 sensor.last_timestamp = timestamp
                 self._queue_point(sensor, coerced, timestamp=timestamp)
 
-        entity_ids = [sensor.entity_id for sensor in self._sensors.values()]
-        if entity_ids:
+        if self._sensors_by_entity:
             self._unsub_state = async_track_state_change_event(
                 self._hass,
-                entity_ids,
+                list(self._sensors_by_entity),
                 self._handle_state_change,
             )
         self._unsub_batch = async_track_time_interval(
@@ -230,19 +236,21 @@ class SensorManager:
             LOGGER.info("%s (%s) is reporting again", sensor.key, sensor.entity_id)
 
     async def _handle_state_change(self, event: Event) -> None:
-        """Handle a new state."""
-        entity_id = event.data["entity_id"]
-        sensor = self._sensors.get(entity_id)
-        if sensor is None:
-            return
-
+        """Handle a new state for each sensor of the entity."""
         new_state: State | None = event.data.get("new_state")
+        for sensor in self._sensors_by_entity.get(event.data["entity_id"], []):
+            await self._handle_sensor_state(sensor, new_state)
+
+    async def _handle_sensor_state(
+        self, sensor: ConfiguredSensor, new_state: State | None
+    ) -> None:
+        """Handle a new state for one sensor."""
         self._check_availability(sensor, new_state)
         if sensor.key in FORECAST_SENSOR_KEYS:
             await self._queue_forecast_points(sensor, new_state)
             return
 
-        value = self._state_to_value(new_state)
+        value = self._state_to_value(new_state, sensor.attribute)
         if value is None:
             return
 
@@ -260,9 +268,11 @@ class SensorManager:
         # Avoid long-gap interpolation artifacts:
         # if we previously wrote 0 and nothing arrived for a while, then a positive
         # value comes in, insert an extra 0 point 1s before the new value.
+        # Car sensors get no gap fill: they write real updates only.
         should_gap_fill = False
         if (
-            sensor.last_timestamp is not None
+            sensor.key not in CAR_SENSOR_NUMBERS
+            and sensor.last_timestamp is not None
             and isinstance(sensor.last_value, (int, float))
             and sensor.last_value == 0
             and isinstance(coerced, (int, float))
@@ -282,17 +292,19 @@ class SensorManager:
         Periodically re-queue all current sensor values.
 
         This ensures continuous data points in InfluxDB even for sensors
-        that remain unchanged (e.g., constantly reporting 0).
+        that remain unchanged (e.g., constantly reporting 0). Car sensors are
+        excluded: SOLECTRUS keeps their reading until the next one, so a
+        repeated reading with a new time would show an old value as current.
         """
         timestamp = self._normalize_timestamp(dt_util.utcnow())
 
         for sensor in self._sensors.values():
-            if sensor.key in FORECAST_SENSOR_KEYS:
+            if sensor.key in FORECAST_SENSOR_KEYS or sensor.key in CAR_SENSOR_NUMBERS:
                 continue
 
             current_state = self._hass.states.get(sensor.entity_id)
             self._check_availability(sensor, current_state)
-            value = self._state_to_value(current_state)
+            value = self._state_to_value(current_state, sensor.attribute)
             if value is None:
                 continue
 
@@ -587,12 +599,16 @@ class SensorManager:
         return dt_util.as_utc(state.last_updated)
 
     @staticmethod
-    def _state_to_value(state: State | None) -> Any | None:
+    def _state_to_value(
+        state: State | None, attribute: str | None = None
+    ) -> Any | None:
         """Convert a Home Assistant state to an Influx friendly value."""
         if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
             return None
 
         raw = state.state
+        if attribute is not None and attribute in state.attributes:
+            raw = str(state.attributes[attribute])
         try:
             int_value = int(raw)
             if str(int_value) == raw:

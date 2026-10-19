@@ -25,9 +25,9 @@ async def async_get_config_entry_diagnostics(
     manager = runtime.manager
 
     sensors_info = {}
-    for entity_id, sensor in manager._sensors.items():  # noqa: SLF001
-        sensors_info[entity_id] = {
-            "key": sensor.key,
+    for key, sensor in manager._sensors.items():  # noqa: SLF001
+        sensors_info[key] = {
+            "entity_id": sensor.entity_id,
             "measurement": sensor.measurement,
             "field": sensor.field,
             "data_type": sensor.data_type,

@@ -9,15 +9,15 @@ This custom integration forwards Home Assistant entity values into an InfluxDB b
 - Configure InfluxDB URL, token, organisation, and bucket directly in the config flow.
 - Map every SOLECTRUS sensor to a Home Assistant entity via the options flow; measurement/field defaults are pre-filled but can be overridden.
 - Writes are batched and sent every 5 seconds; points are deduplicated by `(sensor, timestamp)` (value may repeat).
-- Every 5 minutes a heartbeat re-writes the current value of each mapped entity, even if it never changed. This keeps a continuous series in InfluxDB for sensors that sit at the same value (e.g. a constant `0`). Forecast sensors are excluded.
+- Every 5 minutes a heartbeat re-writes the current value of each mapped entity, even if it never changed. This keeps a continuous series in InfluxDB for sensors that sit at the same value (e.g. a constant `0`). Forecast and [car sensors](#electric-cars) are excluded.
 - Values outside a sensor's plausible range are discarded rather than written - see [Value range checks](#value-range-checks).
-- When a sensor stayed at `0` for at least 30 seconds and then resumes with a positive value, the integration inserts an extra `0` point 1 second before the resume to avoid interpolation ramps.
+- When a sensor stayed at `0` for at least 30 seconds and then resumes with a positive value, the integration inserts an extra `0` point 1 second before the resume to avoid interpolation ramps. Car sensors are excluded.
 - If InfluxDB is unreachable, points are buffered and retried with the next batch. The buffer holds up to 10,000 points; beyond that the oldest are dropped.
 - Forecast sensors (power, clear-sky power, outdoor temperature) are batched as full time series instead of a single point - see [Forecast sensors](#forecast-sensors).
 
 ## Requirements
 
-- Home Assistant `2024.6` or newer
+- Home Assistant `2024.7` or newer
 - InfluxDB 2.x reachable from Home Assistant (URL + org + bucket + token)
 - An InfluxDB token with **read and write** access to the target bucket (read is used to detect existing field types so the integration matches them automatically)
 
@@ -75,11 +75,32 @@ The ranges are:
 
 - **Power sensors** (inverter, house, battery charging/discharging, heat pump, grid, wallbox, `CUSTOM_*`): minimum `0`. A sensor that reports negative values for the opposite direction of flow therefore needs a template sensor, or must be split into separate import/export entities.
 - **`BATTERY_SOC` and `CAR_BATTERY_SOC`**: `0` to `100`.
+- **`CAR_ODOMETER` and `CAR_RANGE`**: minimum `0`.
+- **`CAR_LATITUDE`**: `-90` to `90`. **`CAR_LONGITUDE`**: `-180` to `180`.
 - Temperatures, status strings, and booleans are unrestricted.
 
 ### Custom sensors
 
 Besides the named keys there are 20 generic slots, `CUSTOM_01` to `CUSTOM_20`, shown as "Consumer 1" to "Consumer 20" in the options flow. They map to the measurements `custom_01` … `custom_20` with the field `power` and are meant for additional consumers your SOLECTRUS instance tracks.
+
+### Electric cars
+
+SOLECTRUS supports up to five electric cars. Each car has six sensors:
+
+| Key               | Field         | Content                                                 |
+| ----------------- | ------------- | ------------------------------------------------------- |
+| `CAR_BATTERY_SOC` | `battery_soc` | State of charge in %                                    |
+| `CAR_ODOMETER`    | `odometer`    | Odometer reading in km                                  |
+| `CAR_RANGE`       | `range`       | Remaining range in km                                   |
+| `CAR_CONNECTED`   | `connected`   | The car is connected to a wallbox or a charging station |
+| `CAR_LATITUDE`    | `latitude`    | Latitude of the car                                     |
+| `CAR_LONGITUDE`   | `longitude`   | Longitude of the car                                    |
+
+The first car uses the keys without a number and the measurement `car`. The cars 2 to 5 add the number to the key and to the measurement. For example, the odometer of car 2 is `CAR_ODOMETER_2` with the measurement `car_2`. The options flow shows each car in a section of its own, "Electric car 1" to "Electric car 5". A section opens by default when at least one sensor of the car has an entity.
+
+For `CAR_LATITUDE` and `CAR_LONGITUDE`, you can select a `device_tracker` entity of the car. The integration then reads the attributes `latitude` and `longitude` of the entity instead of its state. One `device_tracker` can feed both keys.
+
+A car sensor is a state: SOLECTRUS keeps a reading until the next one, and a parked car can send no update for days. The integration therefore writes a car sensor only when Home Assistant updates the entity, with the time of that update. The heartbeat does not repeat it, and no extra `0` point is added. A repeated reading with a new time shows an old value as current. This needs a SOLECTRUS version after v1.3.4. Version v1.3.4 treats a state of charge older than 2 hours as outdated.
 
 ### Advanced options
 

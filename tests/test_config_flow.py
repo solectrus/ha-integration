@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import voluptuous as vol
+from homeassistant.data_entry_flow import section
 
 from custom_components.solectrus.api import SolectrusInfluxError
 from custom_components.solectrus.config_flow import (
@@ -16,6 +17,7 @@ from custom_components.solectrus.config_flow import (
     _parse_sensors_input,
 )
 from custom_components.solectrus.const import (
+    CAR_SENSOR_DEFINITIONS,
     CONF_BUCKET,
     CONF_ENTITY_ID,
     CONF_FIELD,
@@ -27,6 +29,8 @@ from custom_components.solectrus.const import (
     CONF_VERIFY_SSL,
     SENSOR_DEFINITIONS,
 )
+
+CAR_PREFIXES = tuple(CAR_SENSOR_DEFINITIONS)
 
 VALID_USER_INPUT = {
     CONF_URL: "http://localhost:8086",
@@ -45,6 +49,17 @@ def _mock_config_entry(data: dict | None = None, options: dict | None = None):
     entry.title = "InfluxDB-Exporter"
     entry.entry_id = "test_entry_id"
     return entry
+
+
+def _all_key_names(schema_dict: dict) -> set[str]:
+    """Return the field names of a schema, including those inside sections."""
+    names: set[str] = set()
+    for key, value in schema_dict.items():
+        if isinstance(value, section):
+            names.update(str(k) for k in value.schema.schema)
+        else:
+            names.add(str(key))
+    return names
 
 
 def _mock_hass(entry=None):
@@ -100,7 +115,7 @@ class TestBuildSensorsSchema:
 
     def test_basic_mode_entity_keys_only(self):
         schema_dict = _build_sensors_schema({}, show_advanced=False)
-        key_names = {str(k) for k in schema_dict}
+        key_names = _all_key_names(schema_dict)
         # In basic mode, only entity keys should be present
         for sensor_key in SENSOR_DEFINITIONS:
             assert f"{sensor_key}_entity" in key_names
@@ -110,7 +125,7 @@ class TestBuildSensorsSchema:
 
     def test_advanced_mode_includes_extra_keys(self):
         schema_dict = _build_sensors_schema({}, show_advanced=True)
-        key_names = {str(k) for k in schema_dict}
+        key_names = _all_key_names(schema_dict)
         for sensor_key in SENSOR_DEFINITIONS:
             assert f"{sensor_key}_entity" in key_names
             assert f"{sensor_key}_measurement" in key_names
@@ -136,6 +151,66 @@ class TestBuildSensorsSchema:
                 assert key.default() == "custom_m"
             if key_str == "INVERTER_POWER_field" and hasattr(key, "default"):
                 assert key.default() == "custom_f"
+
+    def test_car_sensors_are_grouped_in_sections(self):
+        schema_dict = _build_sensors_schema({}, show_advanced=False)
+        top_level = [str(k) for k in schema_dict]
+
+        sections = [k for k in top_level if k.startswith("car_")]
+        assert sections == ["car_1", "car_2", "car_3", "car_4", "car_5"]
+        assert not any(k.startswith("CAR_") for k in top_level)
+        # The sections come before the custom consumers
+        assert top_level.index("car_5") < top_level.index("CUSTOM_01_entity")
+
+        car_1 = {str(k) for k in schema_dict["car_1"].schema.schema}
+        car_2 = {str(k) for k in schema_dict["car_2"].schema.schema}
+        assert car_1 == {f"{prefix}_entity" for prefix in CAR_PREFIXES}
+        assert car_2 == {f"{prefix}_2_entity" for prefix in CAR_PREFIXES}
+
+    def test_car_section_expanded_only_when_mapped(self):
+        existing = {"CAR_RANGE_2": {CONF_ENTITY_ID: "sensor.car_2_range"}}
+        schema_dict = _build_sensors_schema(existing, show_advanced=False)
+
+        collapsed = {
+            str(k): v.options["collapsed"]
+            for k, v in schema_dict.items()
+            if isinstance(v, section)
+        }
+        assert collapsed == {
+            "car_1": True,
+            "car_2": False,
+            "car_3": True,
+            "car_4": True,
+            "car_5": True,
+        }
+
+
+class TestCarSensorDefinitions:
+    """Tests for the car sensors in SENSOR_DEFINITIONS."""
+
+    def test_first_car_has_no_number(self):
+        for prefix in CAR_PREFIXES:
+            assert SENSOR_DEFINITIONS[prefix].measurement == "car"
+            assert f"{prefix}_1" not in SENSOR_DEFINITIONS
+
+    def test_other_cars_have_number_in_key_and_measurement(self):
+        for number in range(2, 6):
+            for prefix in CAR_PREFIXES:
+                definition = SENSOR_DEFINITIONS[f"{prefix}_{number}"]
+                assert definition.measurement == f"car_{number}"
+                assert definition.field == SENSOR_DEFINITIONS[prefix].field
+        assert "CAR_ODOMETER_6" not in SENSOR_DEFINITIONS
+
+    def test_fields_match_solectrus(self):
+        fields = {prefix: SENSOR_DEFINITIONS[prefix].field for prefix in CAR_PREFIXES}
+        assert fields == {
+            "CAR_BATTERY_SOC": "battery_soc",
+            "CAR_ODOMETER": "odometer",
+            "CAR_RANGE": "range",
+            "CAR_CONNECTED": "connected",
+            "CAR_LATITUDE": "latitude",
+            "CAR_LONGITUDE": "longitude",
+        }
 
 
 class TestParseSensorsInput:
@@ -209,6 +284,29 @@ class TestParseSensorsInput:
         sensor = result["INVERTER_POWER"]
         assert sensor[CONF_MEASUREMENT] == "existing_m"
         assert sensor[CONF_FIELD] == "existing_f"
+
+    def test_reads_fields_inside_car_sections(self):
+        user_input = {
+            "HOUSE_POWER_entity": "sensor.house",
+            "car_1": {"CAR_BATTERY_SOC_entity": "sensor.car_soc"},
+            "car_3": {
+                "CAR_ODOMETER_3_entity": "sensor.car_3_odometer",
+                "CAR_ODOMETER_3_measurement": "my_car",
+            },
+        }
+        result = _parse_sensors_input(user_input, {}, show_advanced=True)
+
+        assert result["CAR_BATTERY_SOC"] == {
+            CONF_ENTITY_ID: "sensor.car_soc",
+            CONF_MEASUREMENT: "car",
+            CONF_FIELD: "battery_soc",
+        }
+        assert result["CAR_ODOMETER_3"] == {
+            CONF_ENTITY_ID: "sensor.car_3_odometer",
+            CONF_MEASUREMENT: "my_car",
+            CONF_FIELD: "odometer",
+        }
+        assert set(result) == {"HOUSE_POWER", "CAR_BATTERY_SOC", "CAR_ODOMETER_3"}
 
     def test_multiple_sensors(self):
         user_input = {

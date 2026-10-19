@@ -97,8 +97,9 @@ class TestStateToValue:
     class MockState:
         """Simple mock for Home Assistant State."""
 
-        def __init__(self, state: str):
+        def __init__(self, state: str, attributes: dict | None = None):
             self.state = state
+            self.attributes = attributes or {}
 
     def test_none_state(self):
         assert SensorManager._state_to_value(None) is None
@@ -138,6 +139,19 @@ class TestStateToValue:
     def test_string_state(self):
         state = self.MockState("heating")
         assert SensorManager._state_to_value(state) == "heating"
+
+    def test_attribute_wins_over_state(self):
+        # A device_tracker has its position in attributes
+        state = self.MockState("not_home", {"latitude": 48.1, "longitude": 11.5})
+        assert SensorManager._state_to_value(state, "latitude") == 48.1
+
+    def test_missing_attribute_falls_back_to_state(self):
+        state = self.MockState("48.1")
+        assert SensorManager._state_to_value(state, "latitude") == 48.1
+
+    def test_attribute_of_unavailable_state(self):
+        state = self.MockState("unavailable", {"latitude": 48.1})
+        assert SensorManager._state_to_value(state, "latitude") is None
 
 
 class TestForecastAttributeList:

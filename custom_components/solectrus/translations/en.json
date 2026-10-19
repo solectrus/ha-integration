@@ -113,9 +113,6 @@
           "CASE_TEMP_entity": "Enclosure temperature",
           "CASE_TEMP_measurement": "↳ Measurement",
           "CASE_TEMP_field": "↳ Field",
-          "CAR_BATTERY_SOC_entity": "Car battery level",
-          "CAR_BATTERY_SOC_measurement": "↳ Measurement",
-          "CAR_BATTERY_SOC_field": "↳ Field",
           "OUTDOOR_TEMP_entity": "Outdoor temperature",
           "OUTDOOR_TEMP_measurement": "↳ Measurement",
           "OUTDOOR_TEMP_field": "↳ Field",
@@ -185,6 +182,123 @@
           "CUSTOM_20_entity": "Consumer 20",
           "CUSTOM_20_measurement": "↳ Measurement",
           "CUSTOM_20_field": "↳ Field"
+        },
+        "sections": {
+          "car_1": {
+            "name": "Electric car 1",
+            "data": {
+              "CAR_BATTERY_SOC_entity": "Battery level",
+              "CAR_BATTERY_SOC_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_field": "↳ Field",
+              "CAR_ODOMETER_entity": "Odometer",
+              "CAR_ODOMETER_measurement": "↳ Measurement",
+              "CAR_ODOMETER_field": "↳ Field",
+              "CAR_RANGE_entity": "Range",
+              "CAR_RANGE_measurement": "↳ Measurement",
+              "CAR_RANGE_field": "↳ Field",
+              "CAR_CONNECTED_entity": "Connected",
+              "CAR_CONNECTED_measurement": "↳ Measurement",
+              "CAR_CONNECTED_field": "↳ Field",
+              "CAR_LATITUDE_entity": "Latitude",
+              "CAR_LATITUDE_measurement": "↳ Measurement",
+              "CAR_LATITUDE_field": "↳ Field",
+              "CAR_LONGITUDE_entity": "Longitude",
+              "CAR_LONGITUDE_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_field": "↳ Field"
+            }
+          },
+          "car_2": {
+            "name": "Electric car 2",
+            "data": {
+              "CAR_BATTERY_SOC_2_entity": "Battery level",
+              "CAR_BATTERY_SOC_2_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_2_field": "↳ Field",
+              "CAR_ODOMETER_2_entity": "Odometer",
+              "CAR_ODOMETER_2_measurement": "↳ Measurement",
+              "CAR_ODOMETER_2_field": "↳ Field",
+              "CAR_RANGE_2_entity": "Range",
+              "CAR_RANGE_2_measurement": "↳ Measurement",
+              "CAR_RANGE_2_field": "↳ Field",
+              "CAR_CONNECTED_2_entity": "Connected",
+              "CAR_CONNECTED_2_measurement": "↳ Measurement",
+              "CAR_CONNECTED_2_field": "↳ Field",
+              "CAR_LATITUDE_2_entity": "Latitude",
+              "CAR_LATITUDE_2_measurement": "↳ Measurement",
+              "CAR_LATITUDE_2_field": "↳ Field",
+              "CAR_LONGITUDE_2_entity": "Longitude",
+              "CAR_LONGITUDE_2_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_2_field": "↳ Field"
+            }
+          },
+          "car_3": {
+            "name": "Electric car 3",
+            "data": {
+              "CAR_BATTERY_SOC_3_entity": "Battery level",
+              "CAR_BATTERY_SOC_3_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_3_field": "↳ Field",
+              "CAR_ODOMETER_3_entity": "Odometer",
+              "CAR_ODOMETER_3_measurement": "↳ Measurement",
+              "CAR_ODOMETER_3_field": "↳ Field",
+              "CAR_RANGE_3_entity": "Range",
+              "CAR_RANGE_3_measurement": "↳ Measurement",
+              "CAR_RANGE_3_field": "↳ Field",
+              "CAR_CONNECTED_3_entity": "Connected",
+              "CAR_CONNECTED_3_measurement": "↳ Measurement",
+              "CAR_CONNECTED_3_field": "↳ Field",
+              "CAR_LATITUDE_3_entity": "Latitude",
+              "CAR_LATITUDE_3_measurement": "↳ Measurement",
+              "CAR_LATITUDE_3_field": "↳ Field",
+              "CAR_LONGITUDE_3_entity": "Longitude",
+              "CAR_LONGITUDE_3_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_3_field": "↳ Field"
+            }
+          },
+          "car_4": {
+            "name": "Electric car 4",
+            "data": {
+              "CAR_BATTERY_SOC_4_entity": "Battery level",
+              "CAR_BATTERY_SOC_4_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_4_field": "↳ Field",
+              "CAR_ODOMETER_4_entity": "Odometer",
+              "CAR_ODOMETER_4_measurement": "↳ Measurement",
+              "CAR_ODOMETER_4_field": "↳ Field",
+              "CAR_RANGE_4_entity": "Range",
+              "CAR_RANGE_4_measurement": "↳ Measurement",
+              "CAR_RANGE_4_field": "↳ Field",
+              "CAR_CONNECTED_4_entity": "Connected",
+              "CAR_CONNECTED_4_measurement": "↳ Measurement",
+              "CAR_CONNECTED_4_field": "↳ Field",
+              "CAR_LATITUDE_4_entity": "Latitude",
+              "CAR_LATITUDE_4_measurement": "↳ Measurement",
+              "CAR_LATITUDE_4_field": "↳ Field",
+              "CAR_LONGITUDE_4_entity": "Longitude",
+              "CAR_LONGITUDE_4_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_4_field": "↳ Field"
+            }
+          },
+          "car_5": {
+            "name": "Electric car 5",
+            "data": {
+              "CAR_BATTERY_SOC_5_entity": "Battery level",
+              "CAR_BATTERY_SOC_5_measurement": "↳ Measurement",
+              "CAR_BATTERY_SOC_5_field": "↳ Field",
+              "CAR_ODOMETER_5_entity": "Odometer",
+              "CAR_ODOMETER_5_measurement": "↳ Measurement",
+              "CAR_ODOMETER_5_field": "↳ Field",
+              "CAR_RANGE_5_entity": "Range",
+              "CAR_RANGE_5_measurement": "↳ Measurement",
+              "CAR_RANGE_5_field": "↳ Field",
+              "CAR_CONNECTED_5_entity": "Connected",
+              "CAR_CONNECTED_5_measurement": "↳ Measurement",
+              "CAR_CONNECTED_5_field": "↳ Field",
+              "CAR_LATITUDE_5_entity": "Latitude",
+              "CAR_LATITUDE_5_measurement": "↳ Measurement",
+              "CAR_LATITUDE_5_field": "↳ Field",
+              "CAR_LONGITUDE_5_entity": "Longitude",
+              "CAR_LONGITUDE_5_measurement": "↳ Measurement",
+              "CAR_LONGITUDE_5_field": "↳ Field"
+            }
+          }
         }
       }
     }

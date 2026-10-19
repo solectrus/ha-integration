@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from logging import Logger, getLogger
 from typing import Final
 
@@ -67,6 +67,9 @@ class SensorDefinition:
     The fallback type is only applied when InfluxDB has no prior data for
     the (measurement, field) pair; otherwise the type detected from existing
     data wins, since Influx freezes the type once a field is written.
+
+    If the state of the entity has the attribute, its value is used instead
+    of the state (for example the latitude of a device_tracker).
     """
 
     measurement: str
@@ -74,6 +77,7 @@ class SensorDefinition:
     data_type: str
     min_value: float | None = None
     max_value: float | None = None
+    attribute: str | None = None
 
 
 SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
@@ -133,13 +137,50 @@ SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
     "WALLBOX_POWER": SensorDefinition("wallbox", "power", DATA_TYPE_INT, min_value=0),
     "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
     "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
-    "CAR_BATTERY_SOC": SensorDefinition(
-        "car", "battery_soc", DATA_TYPE_FLOAT, min_value=0, max_value=100
-    ),
     "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
     "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
     "SYSTEM_STATUS_OK": SensorDefinition("system", "status_ok", DATA_TYPE_BOOL),
 }
+
+# SOLECTRUS supports up to five electric cars. Car 1 has the keys without a
+# number and the measurement "car". Cars 2-5 add the number to both
+# (CAR_ODOMETER_2, "car_2").
+CAR_COUNT: Final = 5
+CAR_SENSOR_DEFINITIONS: Final[dict[str, SensorDefinition]] = {
+    "CAR_BATTERY_SOC": SensorDefinition(
+        "car", "battery_soc", DATA_TYPE_FLOAT, min_value=0, max_value=100
+    ),
+    "CAR_ODOMETER": SensorDefinition("car", "odometer", DATA_TYPE_FLOAT, min_value=0),
+    "CAR_RANGE": SensorDefinition("car", "range", DATA_TYPE_FLOAT, min_value=0),
+    "CAR_CONNECTED": SensorDefinition("car", "connected", DATA_TYPE_BOOL),
+    "CAR_LATITUDE": SensorDefinition(
+        "car",
+        "latitude",
+        DATA_TYPE_FLOAT,
+        min_value=-90,
+        max_value=90,
+        attribute="latitude",
+    ),
+    "CAR_LONGITUDE": SensorDefinition(
+        "car",
+        "longitude",
+        DATA_TYPE_FLOAT,
+        min_value=-180,
+        max_value=180,
+        attribute="longitude",
+    ),
+}
+
+# Sensor key -> number of its car
+CAR_SENSOR_NUMBERS: Final[dict[str, int]] = {}
+
+for number in range(1, CAR_COUNT + 1):
+    suffix = "" if number == 1 else f"_{number}"
+    for prefix, definition in CAR_SENSOR_DEFINITIONS.items():
+        SENSOR_DEFINITIONS[prefix + suffix] = replace(
+            definition, measurement=f"car{suffix}"
+        )
+        CAR_SENSOR_NUMBERS[prefix + suffix] = number
 
 for index in range(1, 21):
     key = f"CUSTOM_{index:02d}"
