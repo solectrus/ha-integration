@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+# Copy the integration to a running Home Assistant and restart it.
+#
+# Needs the "Samba share" add-on, which shares the configuration folder,
+# and a long-lived access token (Profile -> Security). Settings come from
+# the environment or from .deploy.env in the repository root:
+#
+#   HA_HOST=192.168.178.27   # Host of Home Assistant
+#   HA_TOKEN=eyJ...          # Long-lived access token
+#   HA_URL=...               # URL of Home Assistant (default: http://HA_HOST:8123)
+#   HA_CONFIG_DIR=...        # Mounted share (default: /Volumes/config)
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+if [[ -f .deploy.env ]]; then
+    # shellcheck disable=SC1091
+    source .deploy.env
+fi
+
+: "${HA_HOST:?Set HA_HOST, for example in .deploy.env}"
+: "${HA_TOKEN:?Set HA_TOKEN, for example in .deploy.env}"
+HA_URL="${HA_URL:-http://${HA_HOST}:8123}"
+HA_CONFIG_DIR="${HA_CONFIG_DIR:-/Volumes/config}"
+
+# Mount the share on macOS, with the credentials from the keychain
+if [[ ! -d "${HA_CONFIG_DIR}/custom_components" ]] && command -v osascript >/dev/null; then
+    osascript -e "mount volume \"smb://${HA_HOST}/config\"" >/dev/null
+fi
+
+if [[ ! -d "${HA_CONFIG_DIR}/custom_components" ]]; then
+    echo "No custom_components in ${HA_CONFIG_DIR}, is the share mounted?" >&2
+    exit 1
+fi
+
+# Samba refuses files that match its veto_files (.DS_Store, ._*). This
+# includes the temporary file of rsync for __init__.py (.__init__.py.XXXX),
+# so --inplace writes each file directly.
+rsync -rt --delete --inplace \
+    --exclude __pycache__ --exclude .DS_Store --exclude '._*' \
+    custom_components/solectrus/ "${HA_CONFIG_DIR}/custom_components/solectrus/"
+echo "Copied to ${HA_CONFIG_DIR}/custom_components/solectrus"
+
+# Home Assistant can close the connection while it shuts down, so an
+# empty reply (exit code 52 of curl) also means that the restart started.
+status=0
+curl -fsS -X POST \
+    -H "Authorization: Bearer ${HA_TOKEN}" \
+    "${HA_URL}/api/services/homeassistant/restart" >/dev/null 2>&1 || status=$?
+if [[ ${status} -ne 0 && ${status} -ne 52 ]]; then
+    echo "Restart failed (curl exit code ${status}), check HA_URL and HA_TOKEN" >&2
+    exit "${status}"
+fi
+echo "Home Assistant restarts"

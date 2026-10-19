@@ -117,6 +117,8 @@ scripts/lint     # Format and lint the codebase with ruff
 scripts/develop  # Start Home Assistant with the integration loaded
 ```
 
+`scripts/deploy` copies the integration to a running Home Assistant and restarts it. It needs the "Samba share" add-on and a long-lived access token. The script header names the settings.
+
 ## Troubleshooting
 
 - **Setup error "Bucket not found"**: ensure the bucket exists and the token has write access to it.
