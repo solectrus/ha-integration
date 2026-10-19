@@ -57,7 +57,6 @@ async def async_setup_entry(
         manager=manager,
     )
 
-    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 
 
@@ -70,14 +69,6 @@ async def async_unload_entry(
     await runtime.manager.async_stop()
     await runtime.client.async_close()
     return True
-
-
-async def async_reload_entry(
-    hass: HomeAssistant,
-    entry: SolectrusConfigEntry,
-) -> None:
-    """Reload config entry."""
-    await hass.config_entries.async_reload(entry.entry_id)
 
 
 def _build_sensor_map(entry: SolectrusConfigEntry) -> dict[str, ConfiguredSensor]:

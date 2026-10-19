@@ -64,12 +64,9 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
                 LOGGER.exception("Unexpected error during Influx validation: %s", exc)
             else:
-                # The entry's update listener (see __init__.py) schedules the
-                # reload, so update the entry and abort without an extra reload.
-                self.hass.config_entries.async_update_entry(
-                    entry, data={**entry.data, **user_input}
+                return self.async_update_reload_and_abort(
+                    entry, data_updates=user_input
                 )
-                return self.async_abort(reason="reconfigure_successful")
             finally:
                 await client.async_close()
 
@@ -130,19 +127,16 @@ class SolectrusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        _config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Return the options flow handler."""
-        return SolectrusOptionsFlowHandler(config_entry)
+        return SolectrusOptionsFlowHandler()
 
 
-class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
+class SolectrusOptionsFlowHandler(config_entries.OptionsFlowWithReload):
     """Handle options for sensor/entity mapping."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self._config_entry = config_entry
-        self._show_advanced: bool = bool(config_entry.options.get("advanced", False))
+    _show_advanced: bool = False
 
     async def async_step_init(
         self, user_input: dict | None = None
@@ -158,7 +152,7 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         "advanced",
-                        default=bool(self._config_entry.options.get("advanced", False)),
+                        default=bool(self.config_entry.options.get("advanced", False)),
                     ): selector.BooleanSelector(selector.BooleanSelectorConfig())
                 }
             ),
@@ -169,7 +163,7 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Manage the sensor mapping options."""
         if user_input is not None:
-            existing_sensors: dict = self._config_entry.options.get(CONF_SENSORS, {})
+            existing_sensors: dict = self.config_entry.options.get(CONF_SENSORS, {})
             sensors = _parse_sensors_input(
                 user_input,
                 existing_sensors,
@@ -177,11 +171,11 @@ class SolectrusOptionsFlowHandler(config_entries.OptionsFlow):
             )
 
             return self.async_create_entry(
-                title=self._config_entry.title,
+                title=self.config_entry.title,
                 data={"advanced": self._show_advanced, CONF_SENSORS: sensors},
             )
 
-        options_sensors: dict = self._config_entry.options.get(CONF_SENSORS, {})
+        options_sensors: dict = self.config_entry.options.get(CONF_SENSORS, {})
         schema_dict = _build_sensors_schema(
             options_sensors, show_advanced=self._show_advanced
         )

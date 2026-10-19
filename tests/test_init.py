@@ -177,7 +177,6 @@ class TestAsyncSetupEntry:
         entry.options = {CONF_SENSORS: {}}
         entry.runtime_data = None
         entry.async_on_unload = MagicMock()
-        entry.add_update_listener = MagicMock()
 
         mock_client = MagicMock()
         mock_client.async_connect = AsyncMock()

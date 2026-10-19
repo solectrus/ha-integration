@@ -51,6 +51,7 @@ def _mock_config_entry(data: dict | None = None, options: dict | None = None):
     entry.options = options or {}
     entry.title = "InfluxDB-Exporter"
     entry.entry_id = "test_entry_id"
+    entry.update_listeners = []
     return entry
 
 
@@ -76,6 +77,15 @@ def _mock_hass(entry=None):
     hass = MagicMock()
     hass.config_entries.async_get_entry.return_value = entry
     return hass
+
+
+def _options_handler(entry):
+    """Create an options flow handler linked to the given entry."""
+    handler = SolectrusOptionsFlowHandler()
+    handler.hass = _mock_hass()
+    handler.hass.config_entries.async_get_known_entry.return_value = entry
+    handler.handler = entry.entry_id
+    return handler
 
 
 class TestInfluxSchema:
@@ -512,6 +522,10 @@ class TestConfigFlowStepReconfigure:
 
         assert result["type"] == "abort"
         assert result["reason"] == "reconfigure_successful"
+        flow.hass.config_entries.async_update_entry.assert_called_once()
+        flow.hass.config_entries.async_schedule_reload.assert_called_once_with(
+            entry.entry_id
+        )
         mock_client.async_validate_connection.assert_awaited_once()
         mock_client.async_close.assert_awaited_once()
 
@@ -573,8 +587,7 @@ class TestOptionsFlowInit:
     @pytest.mark.asyncio
     async def test_options_init_shows_form(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
 
         result = await handler.async_step_init(user_input=None)
 
@@ -584,8 +597,7 @@ class TestOptionsFlowInit:
     @pytest.mark.asyncio
     async def test_options_init_with_existing_advanced(self):
         entry = _mock_config_entry(options={"advanced": True})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
 
         result = await handler.async_step_init(user_input=None)
 
@@ -598,8 +610,7 @@ class TestOptionsFlowInit:
     @pytest.mark.asyncio
     async def test_options_init_advances_to_sensors(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
 
         result = await handler.async_step_init(user_input={"advanced": True})
 
@@ -611,8 +622,7 @@ class TestOptionsFlowInit:
     @pytest.mark.asyncio
     async def test_options_init_basic_mode(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
 
         result = await handler.async_step_init(user_input={"advanced": False})
 
@@ -627,8 +637,7 @@ class TestOptionsFlowSensors:
     @pytest.mark.asyncio
     async def test_sensors_form_shown(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
         handler._show_advanced = False
 
         result = await handler.async_step_sensors(user_input=None)
@@ -639,8 +648,7 @@ class TestOptionsFlowSensors:
     @pytest.mark.asyncio
     async def test_sensors_create_entry_basic(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
         handler._show_advanced = False
 
         user_input = {
@@ -659,8 +667,7 @@ class TestOptionsFlowSensors:
     @pytest.mark.asyncio
     async def test_sensors_create_entry_advanced(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
         handler._show_advanced = True
 
         user_input = {
@@ -679,8 +686,7 @@ class TestOptionsFlowSensors:
     @pytest.mark.asyncio
     async def test_sensors_empty_input_creates_empty_sensors(self):
         entry = _mock_config_entry(options={})
-        handler = SolectrusOptionsFlowHandler(entry)
-        handler.hass = _mock_hass()
+        handler = _options_handler(entry)
         handler._show_advanced = False
 
         result = await handler.async_step_sensors(user_input={})
@@ -697,4 +703,4 @@ class TestOptionsFlowFactory:
         handler = SolectrusConfigFlow.async_get_options_flow(entry)
 
         assert isinstance(handler, SolectrusOptionsFlowHandler)
-        assert handler._config_entry is entry
+        assert handler.automatic_reload is True
