@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -28,6 +30,7 @@ from custom_components.solectrus.const import (
     CONF_URL,
     CONF_VERIFY_SSL,
     SENSOR_DEFINITIONS,
+    SENSOR_GROUPS,
 )
 
 CAR_PREFIXES = tuple(CAR_SENSOR_DEFINITIONS)
@@ -51,15 +54,21 @@ def _mock_config_entry(data: dict | None = None, options: dict | None = None):
     return entry
 
 
+_GROUP_OF_KEY = {key: group for group, keys in SENSOR_GROUPS.items() for key in keys}
+
+
+def _sectioned(flat_input: dict) -> dict:
+    """Put form fields into the sections of their groups, like the form sends them."""
+    sectioned: dict = {}
+    for name, value in flat_input.items():
+        key = name.rsplit("_", 1)[0]
+        sectioned.setdefault(_GROUP_OF_KEY[key], {})[name] = value
+    return sectioned
+
+
 def _all_key_names(schema_dict: dict) -> set[str]:
-    """Return the field names of a schema, including those inside sections."""
-    names: set[str] = set()
-    for key, value in schema_dict.items():
-        if isinstance(value, section):
-            names.update(str(k) for k in value.schema.schema)
-        else:
-            names.add(str(key))
-    return names
+    """Return the field names inside the sections of a schema."""
+    return {str(k) for value in schema_dict.values() for k in value.schema.schema}
 
 
 def _mock_hass(entry=None):
@@ -142,47 +151,79 @@ class TestBuildSensorsSchema:
             },
         }
         schema_dict = _build_sensors_schema(existing, show_advanced=True)
-        # Find the entity key for INVERTER_POWER and check its suggested_value / default
-        for key in schema_dict:
-            key_str = str(key)
-            if key_str == "INVERTER_POWER_entity":
-                assert key.description["suggested_value"] == "sensor.inverter"
-            if key_str == "INVERTER_POWER_measurement" and hasattr(key, "default"):
-                assert key.default() == "custom_m"
-            if key_str == "INVERTER_POWER_field" and hasattr(key, "default"):
-                assert key.default() == "custom_f"
+        fields = {str(k): k for k in schema_dict["inverter"].schema.schema}
 
-    def test_car_sensors_are_grouped_in_sections(self):
+        entity = fields["INVERTER_POWER_entity"]
+        assert entity.description["suggested_value"] == "sensor.inverter"
+        assert fields["INVERTER_POWER_measurement"].default() == "custom_m"
+        assert fields["INVERTER_POWER_field"].default() == "custom_f"
+
+    def test_sections_follow_the_groups_of_helios(self):
         schema_dict = _build_sensors_schema({}, show_advanced=False)
-        top_level = [str(k) for k in schema_dict]
 
-        sections = [k for k in top_level if k.startswith("car_")]
-        assert sections == ["car_1", "car_2", "car_3", "car_4", "car_5"]
-        assert not any(k.startswith("CAR_") for k in top_level)
-        # The sections come before the custom consumers
-        assert top_level.index("car_5") < top_level.index("CUSTOM_01_entity")
+        assert [str(k) for k in schema_dict] == [
+            "inverter",
+            "grid",
+            "battery",
+            "wallbox",
+            "car_1",
+            "car_2",
+            "car_3",
+            "car_4",
+            "car_5",
+            "heatpump",
+            "forecast",
+            "custom",
+        ]
+        assert all(isinstance(value, section) for value in schema_dict.values())
+
+    def test_car_sections_hold_the_sensors_of_their_car(self):
+        schema_dict = _build_sensors_schema({}, show_advanced=False)
 
         car_1 = {str(k) for k in schema_dict["car_1"].schema.schema}
         car_2 = {str(k) for k in schema_dict["car_2"].schema.schema}
         assert car_1 == {f"{prefix}_entity" for prefix in CAR_PREFIXES}
         assert car_2 == {f"{prefix}_2_entity" for prefix in CAR_PREFIXES}
 
-    def test_car_section_expanded_only_when_mapped(self):
-        existing = {"CAR_RANGE_2": {CONF_ENTITY_ID: "sensor.car_2_range"}}
+    @staticmethod
+    def _expanded(schema_dict: dict) -> list[str]:
+        return [str(k) for k, v in schema_dict.items() if not v.options["collapsed"]]
+
+    def test_first_setup_opens_inverter_and_grid(self):
+        schema_dict = _build_sensors_schema({}, show_advanced=False)
+
+        assert self._expanded(schema_dict) == ["inverter", "grid"]
+
+    def test_section_expanded_only_when_mapped(self):
+        existing = {
+            "HEATPUMP_POWER": {CONF_ENTITY_ID: "sensor.heatpump"},
+            "CAR_RANGE_2": {CONF_ENTITY_ID: "sensor.car_2_range"},
+        }
         schema_dict = _build_sensors_schema(existing, show_advanced=False)
 
-        collapsed = {
-            str(k): v.options["collapsed"]
-            for k, v in schema_dict.items()
-            if isinstance(v, section)
-        }
-        assert collapsed == {
-            "car_1": True,
-            "car_2": False,
-            "car_3": True,
-            "car_4": True,
-            "car_5": True,
-        }
+        assert self._expanded(schema_dict) == ["car_2", "heatpump"]
+
+
+class TestTranslations:
+    """Each section and each field of the options flow has a label."""
+
+    @pytest.mark.parametrize("language", ["de", "en"])
+    def test_sections_and_fields_are_translated(self, language):
+        path = (
+            Path(__file__).parent.parent
+            / "custom_components/solectrus/translations"
+            / f"{language}.json"
+        )
+        sections = json.loads(path.read_text())["options"]["step"]["sensors"][
+            "sections"
+        ]
+        schema_dict = _build_sensors_schema({}, show_advanced=True)
+
+        assert set(sections) == {str(k) for k in schema_dict}
+        for key, value in schema_dict.items():
+            fields = {str(k) for k in value.schema.schema}
+            assert sections[str(key)]["name"]
+            assert set(sections[str(key)]["data"]) == fields
 
 
 class TestCarSensorDefinitions:
@@ -222,7 +263,7 @@ class TestParseSensorsInput:
 
     def test_entity_id_only_basic_mode(self):
         user_input = {"INVERTER_POWER_entity": "sensor.inverter_power"}
-        result = _parse_sensors_input(user_input, {}, show_advanced=False)
+        result = _parse_sensors_input(_sectioned(user_input), {}, show_advanced=False)
         assert "INVERTER_POWER" in result
         sensor = result["INVERTER_POWER"]
         assert sensor[CONF_ENTITY_ID] == "sensor.inverter_power"
@@ -238,7 +279,7 @@ class TestParseSensorsInput:
             "INVERTER_POWER_measurement": "custom_inverter",
             "INVERTER_POWER_field": "custom_power",
         }
-        result = _parse_sensors_input(user_input, {}, show_advanced=True)
+        result = _parse_sensors_input(_sectioned(user_input), {}, show_advanced=True)
         sensor = result["INVERTER_POWER"]
         assert sensor[CONF_MEASUREMENT] == "custom_inverter"
         assert sensor[CONF_FIELD] == "custom_power"
@@ -249,7 +290,7 @@ class TestParseSensorsInput:
             "INVERTER_POWER_entity": None,
             "HOUSE_POWER_entity": "sensor.house_power",
         }
-        result = _parse_sensors_input(user_input, {}, show_advanced=False)
+        result = _parse_sensors_input(_sectioned(user_input), {}, show_advanced=False)
         assert "INVERTER_POWER" not in result
         assert "HOUSE_POWER" in result
 
@@ -261,7 +302,9 @@ class TestParseSensorsInput:
             },
         }
         user_input = {"INVERTER_POWER_entity": "sensor.inverter_power"}
-        result = _parse_sensors_input(user_input, existing, show_advanced=False)
+        result = _parse_sensors_input(
+            _sectioned(user_input), existing, show_advanced=False
+        )
         sensor = result["INVERTER_POWER"]
         # Basic mode uses existing sensor config, not defaults
         assert sensor[CONF_MEASUREMENT] == "existing_m"
@@ -280,14 +323,16 @@ class TestParseSensorsInput:
             "INVERTER_POWER_measurement": "",
             "INVERTER_POWER_field": "",
         }
-        result = _parse_sensors_input(user_input, existing, show_advanced=True)
+        result = _parse_sensors_input(
+            _sectioned(user_input), existing, show_advanced=True
+        )
         sensor = result["INVERTER_POWER"]
         assert sensor[CONF_MEASUREMENT] == "existing_m"
         assert sensor[CONF_FIELD] == "existing_f"
 
-    def test_reads_fields_inside_car_sections(self):
+    def test_reads_fields_inside_sections(self):
         user_input = {
-            "HOUSE_POWER_entity": "sensor.house",
+            "grid": {"HOUSE_POWER_entity": "sensor.house"},
             "car_1": {"CAR_BATTERY_SOC_entity": "sensor.car_soc"},
             "car_3": {
                 "CAR_ODOMETER_3_entity": "sensor.car_3_odometer",
@@ -314,7 +359,7 @@ class TestParseSensorsInput:
             "HOUSE_POWER_entity": "sensor.house",
             "BATTERY_SOC_entity": "sensor.battery",
         }
-        result = _parse_sensors_input(user_input, {}, show_advanced=False)
+        result = _parse_sensors_input(_sectioned(user_input), {}, show_advanced=False)
         assert len(result) == 3
         assert "INVERTER_POWER" in result
         assert "HOUSE_POWER" in result
@@ -602,7 +647,7 @@ class TestOptionsFlowSensors:
             "INVERTER_POWER_entity": "sensor.inverter_power",
             "HOUSE_POWER_entity": "sensor.house_power",
         }
-        result = await handler.async_step_sensors(user_input=user_input)
+        result = await handler.async_step_sensors(user_input=_sectioned(user_input))
 
         assert result["type"] == "create_entry"
         assert result["data"]["advanced"] is False
@@ -623,7 +668,7 @@ class TestOptionsFlowSensors:
             "INVERTER_POWER_measurement": "custom_meas",
             "INVERTER_POWER_field": "custom_field",
         }
-        result = await handler.async_step_sensors(user_input=user_input)
+        result = await handler.async_step_sensors(user_input=_sectioned(user_input))
 
         assert result["type"] == "create_entry"
         assert result["data"]["advanced"] is True

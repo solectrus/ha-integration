@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 from .api import SolectrusInfluxClient, SolectrusInfluxError
 from .const import (
-    CAR_SENSOR_NUMBERS,
+    CAR_SENSOR_KEYS,
     DATA_TYPE_BOOL,
     DATA_TYPE_FLOAT,
     DATA_TYPE_INT,
@@ -271,7 +271,7 @@ class SensorManager:
         # Car sensors get no gap fill: they write real updates only.
         should_gap_fill = False
         if (
-            sensor.key not in CAR_SENSOR_NUMBERS
+            sensor.key not in CAR_SENSOR_KEYS
             and sensor.last_timestamp is not None
             and isinstance(sensor.last_value, (int, float))
             and sensor.last_value == 0
@@ -299,7 +299,7 @@ class SensorManager:
         timestamp = self._normalize_timestamp(dt_util.utcnow())
 
         for sensor in self._sensors.values():
-            if sensor.key in FORECAST_SENSOR_KEYS or sensor.key in CAR_SENSOR_NUMBERS:
+            if sensor.key in FORECAST_SENSOR_KEYS or sensor.key in CAR_SENSOR_KEYS:
                 continue
 
             current_state = self._hass.states.get(sensor.entity_id)

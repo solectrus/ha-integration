@@ -80,68 +80,6 @@ class SensorDefinition:
     attribute: str | None = None
 
 
-SENSOR_DEFINITIONS: dict[str, SensorDefinition] = {
-    "INVERTER_POWER": SensorDefinition("inverter", "power", DATA_TYPE_INT, min_value=0),
-    "INVERTER_POWER_1": SensorDefinition(
-        "inverter_1", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_2": SensorDefinition(
-        "inverter_2", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_3": SensorDefinition(
-        "inverter_3", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_4": SensorDefinition(
-        "inverter_4", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_5": SensorDefinition(
-        "inverter_5", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_FORECAST": SensorDefinition(
-        "inverter_forecast", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "INVERTER_POWER_FORECAST_CLEARSKY": SensorDefinition(
-        "inverter_forecast_clearsky", "power", DATA_TYPE_INT, min_value=0
-    ),
-    "HOUSE_POWER": SensorDefinition("house", "power", DATA_TYPE_INT, min_value=0),
-    "BATTERY_SOC": SensorDefinition(
-        "battery", "soc", DATA_TYPE_FLOAT, min_value=0, max_value=100
-    ),
-    "BATTERY_CHARGING_POWER": SensorDefinition(
-        "battery", "charging_power", DATA_TYPE_INT, min_value=0
-    ),
-    "BATTERY_DISCHARGING_POWER": SensorDefinition(
-        "battery", "discharging_power", DATA_TYPE_INT, min_value=0
-    ),
-    "HEATPUMP_POWER": SensorDefinition("heatpump", "power", DATA_TYPE_INT, min_value=0),
-    "HEATPUMP_HEATING_POWER": SensorDefinition(
-        "heatpump", "heating_power", DATA_TYPE_INT, min_value=0
-    ),
-    "HEATPUMP_TANK_TEMP": SensorDefinition("heatpump", "tank_temp", DATA_TYPE_FLOAT),
-    "HEATPUMP_TANK_TEMP_SETPOINT": SensorDefinition(
-        "heatpump", "tank_temp_setpoint", DATA_TYPE_FLOAT
-    ),
-    "HEATPUMP_STATUS": SensorDefinition("heatpump", "status", DATA_TYPE_STRING),
-    "OUTDOOR_TEMP_FORECAST": SensorDefinition(
-        "outdoor_forecast", "temperature", DATA_TYPE_FLOAT
-    ),
-    "GRID_EXPORT_POWER": SensorDefinition(
-        "grid", "export_power", DATA_TYPE_INT, min_value=0
-    ),
-    "GRID_EXPORT_LIMIT": SensorDefinition(
-        "grid", "export_limit", DATA_TYPE_INT, min_value=0
-    ),
-    "GRID_IMPORT_POWER": SensorDefinition(
-        "grid", "import_power", DATA_TYPE_INT, min_value=0
-    ),
-    "WALLBOX_POWER": SensorDefinition("wallbox", "power", DATA_TYPE_INT, min_value=0),
-    "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
-    "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
-    "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
-    "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
-    "SYSTEM_STATUS_OK": SensorDefinition("system", "status_ok", DATA_TYPE_BOOL),
-}
-
 # SOLECTRUS supports up to five electric cars. Car 1 has the keys without a
 # number and the measurement "car". Cars 2-5 add the number to both
 # (CAR_ODOMETER_2, "car_2").
@@ -171,19 +109,103 @@ CAR_SENSOR_DEFINITIONS: Final[dict[str, SensorDefinition]] = {
     ),
 }
 
-# Sensor key -> number of its car
-CAR_SENSOR_NUMBERS: Final[dict[str, int]] = {}
 
-for number in range(1, CAR_COUNT + 1):
+def _car_sensors(number: int) -> dict[str, SensorDefinition]:
     suffix = "" if number == 1 else f"_{number}"
-    for prefix, definition in CAR_SENSOR_DEFINITIONS.items():
-        SENSOR_DEFINITIONS[prefix + suffix] = replace(
-            definition, measurement=f"car{suffix}"
-        )
-        CAR_SENSOR_NUMBERS[prefix + suffix] = number
+    return {
+        prefix + suffix: replace(definition, measurement=f"car{suffix}")
+        for prefix, definition in CAR_SENSOR_DEFINITIONS.items()
+    }
 
-for index in range(1, 21):
-    key = f"CUSTOM_{index:02d}"
-    SENSOR_DEFINITIONS[key] = SensorDefinition(
-        f"custom_{index:02d}", "power", DATA_TYPE_INT, min_value=0
-    )
+
+# The sensors in the groups of the sensor overview of HELIOS. Each group is a
+# section of the options flow.
+SENSOR_GROUPS: Final[dict[str, dict[str, SensorDefinition]]] = {
+    "inverter": {
+        "INVERTER_POWER": SensorDefinition(
+            "inverter", "power", DATA_TYPE_INT, min_value=0
+        ),
+        **{
+            f"INVERTER_POWER_{index}": SensorDefinition(
+                f"inverter_{index}", "power", DATA_TYPE_INT, min_value=0
+            )
+            for index in range(1, 6)
+        },
+        "CASE_TEMP": SensorDefinition("case", "temperature", DATA_TYPE_FLOAT),
+        "SYSTEM_STATUS": SensorDefinition("system", "status", DATA_TYPE_STRING),
+        "SYSTEM_STATUS_OK": SensorDefinition("system", "status_ok", DATA_TYPE_BOOL),
+    },
+    "grid": {
+        "GRID_IMPORT_POWER": SensorDefinition(
+            "grid", "import_power", DATA_TYPE_INT, min_value=0
+        ),
+        "GRID_EXPORT_POWER": SensorDefinition(
+            "grid", "export_power", DATA_TYPE_INT, min_value=0
+        ),
+        "GRID_EXPORT_LIMIT": SensorDefinition(
+            "grid", "export_limit", DATA_TYPE_INT, min_value=0
+        ),
+        "HOUSE_POWER": SensorDefinition("house", "power", DATA_TYPE_INT, min_value=0),
+    },
+    "battery": {
+        "BATTERY_CHARGING_POWER": SensorDefinition(
+            "battery", "charging_power", DATA_TYPE_INT, min_value=0
+        ),
+        "BATTERY_DISCHARGING_POWER": SensorDefinition(
+            "battery", "discharging_power", DATA_TYPE_INT, min_value=0
+        ),
+        "BATTERY_SOC": SensorDefinition(
+            "battery", "soc", DATA_TYPE_FLOAT, min_value=0, max_value=100
+        ),
+    },
+    "wallbox": {
+        "WALLBOX_POWER": SensorDefinition(
+            "wallbox", "power", DATA_TYPE_INT, min_value=0
+        ),
+        "WALLBOX_CONNECTED": SensorDefinition("wallbox", "connected", DATA_TYPE_BOOL),
+    },
+    **{f"car_{number}": _car_sensors(number) for number in range(1, CAR_COUNT + 1)},
+    "heatpump": {
+        "HEATPUMP_POWER": SensorDefinition(
+            "heatpump", "power", DATA_TYPE_INT, min_value=0
+        ),
+        "HEATPUMP_HEATING_POWER": SensorDefinition(
+            "heatpump", "heating_power", DATA_TYPE_INT, min_value=0
+        ),
+        "HEATPUMP_TANK_TEMP": SensorDefinition(
+            "heatpump", "tank_temp", DATA_TYPE_FLOAT
+        ),
+        "HEATPUMP_TANK_TEMP_SETPOINT": SensorDefinition(
+            "heatpump", "tank_temp_setpoint", DATA_TYPE_FLOAT
+        ),
+        "HEATPUMP_STATUS": SensorDefinition("heatpump", "status", DATA_TYPE_STRING),
+        "OUTDOOR_TEMP": SensorDefinition("outdoor", "temperature", DATA_TYPE_FLOAT),
+    },
+    "forecast": {
+        "INVERTER_POWER_FORECAST": SensorDefinition(
+            "inverter_forecast", "power", DATA_TYPE_INT, min_value=0
+        ),
+        "INVERTER_POWER_FORECAST_CLEARSKY": SensorDefinition(
+            "inverter_forecast_clearsky", "power", DATA_TYPE_INT, min_value=0
+        ),
+        "OUTDOOR_TEMP_FORECAST": SensorDefinition(
+            "outdoor_forecast", "temperature", DATA_TYPE_FLOAT
+        ),
+    },
+    "custom": {
+        f"CUSTOM_{index:02d}": SensorDefinition(
+            f"custom_{index:02d}", "power", DATA_TYPE_INT, min_value=0
+        )
+        for index in range(1, 21)
+    },
+}
+
+SENSOR_DEFINITIONS: Final[dict[str, SensorDefinition]] = {
+    key: definition
+    for definitions in SENSOR_GROUPS.values()
+    for key, definition in definitions.items()
+}
+
+CAR_SENSOR_KEYS: Final[frozenset[str]] = frozenset(
+    key for number in range(1, CAR_COUNT + 1) for key in SENSOR_GROUPS[f"car_{number}"]
+)

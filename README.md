@@ -47,7 +47,7 @@ You can enter the URL with or without a scheme:
 1. Ensure the integration is installed (see **Installation** above).
 2. Go to **Settings → Devices & services → Add integration** and search for **SOLECTRUS**.
 3. Enter your InfluxDB connection details (URL, token, org, bucket). The integration validates access by writing a test point.
-4. Open the integration **Options** and map the SOLECTRUS sensor keys to the Home Assistant entities you want to forward.
+4. Open the integration **Options** and map the SOLECTRUS sensor keys to the Home Assistant entities you want to forward. The options flow shows the sensors in sections, with the same groups as the sensor overview of HELIOS. A section opens by default when at least one of its sensors has an entity. At the first setup, the sections for the inverter and the grid open.
 
 Notes:
 
@@ -77,11 +77,12 @@ The ranges are:
 - **`BATTERY_SOC` and `CAR_BATTERY_SOC`**: `0` to `100`.
 - **`CAR_ODOMETER` and `CAR_RANGE`**: minimum `0`.
 - **`CAR_LATITUDE`**: `-90` to `90`. **`CAR_LONGITUDE`**: `-180` to `180`.
+- The ranges of the `CAR_*` keys apply to all five cars.
 - Temperatures, status strings, and booleans are unrestricted.
 
 ### Custom sensors
 
-Besides the named keys there are 20 generic slots, `CUSTOM_01` to `CUSTOM_20`, shown as "Consumer 1" to "Consumer 20" in the options flow. They map to the measurements `custom_01` … `custom_20` with the field `power` and are meant for additional consumers your SOLECTRUS instance tracks.
+Besides the named keys there are 20 generic slots, `CUSTOM_01` to `CUSTOM_20`, shown as "Consumer 1" to "Consumer 20" in the section "Custom consumers" of the options flow. They map to the measurements `custom_01` … `custom_20` with the field `power` and are meant for additional consumers your SOLECTRUS instance tracks.
 
 ### Electric cars
 
@@ -96,15 +97,17 @@ SOLECTRUS supports up to five electric cars. Each car has six sensors:
 | `CAR_LATITUDE`    | `latitude`    | Latitude of the car                                     |
 | `CAR_LONGITUDE`   | `longitude`   | Longitude of the car                                    |
 
-The first car uses the keys without a number and the measurement `car`. The cars 2 to 5 add the number to the key and to the measurement. For example, the odometer of car 2 is `CAR_ODOMETER_2` with the measurement `car_2`. The options flow shows each car in a section of its own, "Electric car 1" to "Electric car 5". A section opens by default when at least one sensor of the car has an entity.
+The first car uses the keys without a number and the measurement `car`. The cars 2 to 5 add the number to the key and to the measurement. For example, the odometer of car 2 is `CAR_ODOMETER_2` with the measurement `car_2`. Each car has a section of its own in the options flow, "Electric car 1" to "Electric car 5".
 
 For `CAR_LATITUDE` and `CAR_LONGITUDE`, you can select a `device_tracker` entity of the car. The integration then reads the attributes `latitude` and `longitude` of the entity instead of its state. One `device_tracker` can feed both keys.
 
 A car sensor is a state: SOLECTRUS keeps a reading until the next one, and a parked car can send no update for days. The integration therefore writes a car sensor only when Home Assistant updates the entity, with the time of that update. The heartbeat does not repeat it, and no extra `0` point is added. A repeated reading with a new time shows an old value as current. This needs a SOLECTRUS version after v1.3.4. Version v1.3.4 treats a state of charge older than 2 hours as outdated.
 
+At a start of Home Assistant or of the integration, the integration writes the current value of each car sensor once. This point gets the time at which Home Assistant loaded the value, which can be later than the time of the reading in the car.
+
 ### Advanced options
 
-In the options flow you can enable **Advanced options**. This shows additional fields per sensor:
+In the first step of the options flow, you can enable **Customize measurement and field**. The next step then shows two more fields per sensor:
 
 - **Measurement**: override the default measurement name.
 - **Field**: override the default field name.
