@@ -13,7 +13,7 @@ This custom integration forwards Home Assistant entity values into an InfluxDB b
 - Values outside a sensor's plausible range are discarded rather than written - see [Value range checks](#value-range-checks).
 - When a sensor stayed at `0` for at least 30 seconds and then resumes with a positive value, the integration inserts an extra `0` point 1 second before the resume to avoid interpolation ramps. Car sensors are excluded.
 - If InfluxDB is unreachable, points are buffered and retried with the next batch. The buffer holds up to 10,000 points; beyond that the oldest are dropped.
-- Forecast sensors (power, clear-sky power, outdoor temperature) are batched as full time series instead of a single point - see [Forecast sensors](#forecast-sensors).
+- Forecast sensors (power, clear-sky power, variability band, outdoor temperature) are batched as full time series instead of a single point - see [Forecast sensors](#forecast-sensors).
 
 ## Requirements
 
@@ -118,16 +118,20 @@ Once configured, the integration listens for entity state changes and writes the
 
 ### Forecast sensors
 
-Three sensor keys are treated as forecast time series instead of a single current value:
+Five sensor keys are treated as forecast time series instead of a single current value:
 
 - `INVERTER_POWER_FORECAST`
 - `INVERTER_POWER_FORECAST_CLEARSKY`
+- `INVERTER_POWER_FORECAST_MIN`
+- `INVERTER_POWER_FORECAST_MAX`
 - `OUTDOOR_TEMP_FORECAST`
+
+`INVERTER_POWER_FORECAST_MIN` and `INVERTER_POWER_FORECAST_MAX` are the variability band: a lower and an upper limit for the PV forecast. The SOLECTRUS dashboard shows the band only when both keys have an entity. This needs SOLECTRUS v1.4.
 
 Instead of writing just the entity's current state, the integration reads the entity's forecast time series attribute (if present) and writes every entry as its own point, timestamped accordingly. This is picked up automatically - no extra configuration needed - as long as the mapped entity exposes one of the following:
 
-- **`forecast` attribute** (a list of `{datetime/time/period_end, ...}` entries) - this is what [pvnode](https://github.com/patricknitsch/ha-pvnode) exposes on its power (`watts`), clear-sky (`watts_clearsky`), and temperature (`temperature`) forecast sensors.
-- **`detailedForecast` / `detailedHourly` attribute** - the format used by [ha-solcast-solar](https://github.com/BJReplay/ha-solcast-solar)'s energy forecast sensors (`period_start` + `pv_estimate`, in kW). The kW value is automatically scaled ×1000 to match the Watt-based `INVERTER_POWER_FORECAST` field. Solcast has no clear-sky or temperature forecast, so only `INVERTER_POWER_FORECAST` is populated from it.
+- **`forecast` attribute** (a list of `{datetime/time/period_end, ...}` entries) - this is what [pvnode](https://github.com/darwindaume/ha-pvnode) exposes on its power (`watts`), clear-sky (`watts_clearsky`), and temperature (`temperature`) forecast sensors. With the pvnode Plus plan, it also has a lower limit (`watts_min`) and an upper limit (`watts_max`) of the power forecast, each on its own sensor.
+- **`detailedForecast` / `detailedHourly` attribute** - the format used by [ha-solcast-solar](https://github.com/BJReplay/ha-solcast-solar)'s energy forecast sensors (`period_start` + `pv_estimate`, in kW). The kW value is automatically scaled ×1000 to match the Watt-based `INVERTER_POWER_FORECAST` field. The 10th and 90th percentiles (`pv_estimate10`, `pv_estimate90`) give the variability band. To use them, select the same Solcast entity for `INVERTER_POWER_FORECAST`, `INVERTER_POWER_FORECAST_MIN`, and `INVERTER_POWER_FORECAST_MAX`. Solcast has no clear-sky or temperature forecast.
 - **A `weather.*` entity** for `OUTDOOR_TEMP_FORECAST` - the integration calls the `weather.get_forecasts` service (`type: hourly`) and writes the returned temperature series.
 
 Not currently supported: the built-in **forecast.solar** integration. It doesn't expose any per-entity forecast attribute - only a config-entry-level "solar forecast" API (used by the Energy dashboard) that returns Wh energy totals, which is a different mechanism this attribute-based batching can't use.

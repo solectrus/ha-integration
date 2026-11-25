@@ -262,6 +262,12 @@
               "INVERTER_POWER_FORECAST_CLEARSKY_entity": "PV forecast (clear sky)",
               "INVERTER_POWER_FORECAST_CLEARSKY_measurement": "↳ Measurement",
               "INVERTER_POWER_FORECAST_CLEARSKY_field": "↳ Field",
+              "INVERTER_POWER_FORECAST_MIN_entity": "PV forecast (lower limit)",
+              "INVERTER_POWER_FORECAST_MIN_measurement": "↳ Measurement",
+              "INVERTER_POWER_FORECAST_MIN_field": "↳ Field",
+              "INVERTER_POWER_FORECAST_MAX_entity": "PV forecast (upper limit)",
+              "INVERTER_POWER_FORECAST_MAX_measurement": "↳ Measurement",
+              "INVERTER_POWER_FORECAST_MAX_field": "↳ Field",
               "OUTDOOR_TEMP_FORECAST_entity": "Outdoor temperature forecast",
               "OUTDOOR_TEMP_FORECAST_measurement": "↳ Measurement",
               "OUTDOOR_TEMP_FORECAST_field": "↳ Field"

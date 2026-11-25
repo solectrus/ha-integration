@@ -13,6 +13,8 @@ DOMAIN = "solectrus"
 FORECAST_SENSOR_KEYS: Final[set[str]] = {
     "INVERTER_POWER_FORECAST_CLEARSKY",
     "INVERTER_POWER_FORECAST",
+    "INVERTER_POWER_FORECAST_MIN",
+    "INVERTER_POWER_FORECAST_MAX",
     "OUTDOOR_TEMP_FORECAST",
 }
 
@@ -22,14 +24,26 @@ FORECAST_SENSOR_KEYS: Final[set[str]] = {
 # ("power") matches simple/generic forecast sources, while the extra names
 # cover integrations that name (and scale) their per-metric forecast keys
 # differently:
-# - pvnode: "watts" / "watts_clearsky", already in W.
+# - pvnode: "watts" / "watts_clearsky", already in W. With the Plus plan,
+#   pvnode also has a variability band as "watts_min" / "watts_max".
 # - ha-solcast-solar: "pv_estimate" in the detailedForecast/detailedHourly
 #   attribute, reported in kW, hence the x1000 factor to match the Watt-based
-#   INVERTER_POWER_FORECAST field. Solcast has no clear-sky or temperature
-#   forecast, so it only applies to INVERTER_POWER_FORECAST.
+#   INVERTER_POWER_FORECAST field. Its 10th and 90th percentiles
+#   ("pv_estimate10" / "pv_estimate90") serve as the band. Solcast has no
+#   clear-sky or temperature forecast.
 FORECAST_ATTRIBUTE_VALUE_KEYS: Final[dict[str, tuple[tuple[str, float], ...]]] = {
     "INVERTER_POWER_FORECAST": (("power", 1), ("watts", 1), ("pv_estimate", 1000)),
     "INVERTER_POWER_FORECAST_CLEARSKY": (("power", 1), ("watts_clearsky", 1)),
+    "INVERTER_POWER_FORECAST_MIN": (
+        ("power_min", 1),
+        ("watts_min", 1),
+        ("pv_estimate10", 1000),
+    ),
+    "INVERTER_POWER_FORECAST_MAX": (
+        ("power_max", 1),
+        ("watts_max", 1),
+        ("pv_estimate90", 1000),
+    ),
     "OUTDOOR_TEMP_FORECAST": (("temperature", 1),),
 }
 
@@ -187,6 +201,12 @@ SENSOR_GROUPS: Final[dict[str, dict[str, SensorDefinition]]] = {
         ),
         "INVERTER_POWER_FORECAST_CLEARSKY": SensorDefinition(
             "inverter_forecast_clearsky", "power", DATA_TYPE_INT, min_value=0
+        ),
+        "INVERTER_POWER_FORECAST_MIN": SensorDefinition(
+            "inverter_forecast", "power_min", DATA_TYPE_INT, min_value=0
+        ),
+        "INVERTER_POWER_FORECAST_MAX": SensorDefinition(
+            "inverter_forecast", "power_max", DATA_TYPE_INT, min_value=0
         ),
         "OUTDOOR_TEMP_FORECAST": SensorDefinition(
             "outdoor_forecast", "temperature", DATA_TYPE_FLOAT

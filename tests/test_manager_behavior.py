@@ -560,6 +560,72 @@ class TestHandleStateChange:
         point = next(iter(mgr._pending.values()))
         assert point.value == 1500.0
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("key", "attribute_key"),
+        [
+            ("INVERTER_POWER_FORECAST_MIN", "watts_min"),
+            ("INVERTER_POWER_FORECAST_MAX", "watts_max"),
+        ],
+    )
+    async def test_forecast_sensor_reads_pvnode_band_keys(self, key, attribute_key):
+        """pvnode's variability band uses "watts_min" / "watts_max"."""
+        sensor = _sensor(key=key, entity_id="sensor.forecast_band")
+        mgr = _manager([sensor])
+
+        new_state = MagicMock()
+        new_state.attributes = {
+            "forecast": [
+                {"datetime": "2024-06-15T13:00:00+00:00", attribute_key: 1200},
+            ]
+        }
+
+        event = MagicMock()
+        event.data = {"entity_id": "sensor.forecast_band", "new_state": new_state}
+
+        await mgr._handle_state_change(event)
+
+        assert len(mgr._pending) == 1
+        point = next(iter(mgr._pending.values()))
+        assert point.value == 1200
+
+    @pytest.mark.asyncio
+    async def test_forecast_band_reads_solcast_percentiles(self):
+        """Solcast's 10th/90th percentiles (kW) fill the band from one entity."""
+        sensors = [
+            _sensor(key=key, entity_id="sensor.solcast")
+            for key in (
+                "INVERTER_POWER_FORECAST",
+                "INVERTER_POWER_FORECAST_MIN",
+                "INVERTER_POWER_FORECAST_MAX",
+            )
+        ]
+        mgr = _manager(sensors)
+
+        new_state = MagicMock()
+        new_state.attributes = {
+            "detailedForecast": [
+                {
+                    "period_start": datetime(2024, 6, 15, 13, 0, 0, tzinfo=UTC),
+                    "pv_estimate10": 0.8,
+                    "pv_estimate": 1.5,
+                    "pv_estimate90": 2.1,
+                },
+            ],
+        }
+
+        event = MagicMock()
+        event.data = {"entity_id": "sensor.solcast", "new_state": new_state}
+
+        await mgr._handle_state_change(event)
+
+        values = {point.sensor.key: point.value for point in mgr._pending.values()}
+        assert values == {
+            "INVERTER_POWER_FORECAST": 1500.0,
+            "INVERTER_POWER_FORECAST_MIN": 800.0,
+            "INVERTER_POWER_FORECAST_MAX": 2100.0,
+        }
+
 
 class TestHeartbeat:
     """Tests for _heartbeat."""
