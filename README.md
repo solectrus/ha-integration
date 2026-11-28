@@ -86,7 +86,7 @@ Besides the named keys there are 20 generic slots, `CUSTOM_01` to `CUSTOM_20`, s
 
 ### Electric cars
 
-SOLECTRUS v1.4 supports up to five electric cars. At this time, v1.4 is a beta version. Version v1.3 reads only `CAR_BATTERY_SOC` of one car and ignores the other car sensors.
+SOLECTRUS v1.4 supports up to five electric cars.
 
 Each car has six sensors:
 
@@ -103,7 +103,7 @@ The first car uses the keys without a number and the measurement `car`. The cars
 
 For `CAR_LATITUDE` and `CAR_LONGITUDE`, you can select a `device_tracker` entity of the car. The integration then reads the attributes `latitude` and `longitude` of the entity instead of its state. One `device_tracker` can feed both keys.
 
-A car sensor is a state: SOLECTRUS keeps a reading until the next one, and a parked car can send no update for days. The integration therefore writes a car sensor only when Home Assistant updates the entity, with the time of that update. The heartbeat does not repeat it, and no extra `0` point is added. A repeated reading with a new time shows an old value as current. This needs SOLECTRUS v1.4. Version v1.3 treats a state of charge older than 2 hours as outdated.
+A car sensor is a state: SOLECTRUS keeps a reading until the next one, and a parked car can send no update for days. The integration therefore writes a car sensor only when Home Assistant updates the entity, with the time of that update. The heartbeat does not repeat it, and no extra `0` point is added. A repeated reading with a new time shows an old value as current. This needs SOLECTRUS v1.4.
 
 At a start of Home Assistant or of the integration, the integration writes the current value of each car sensor once. This point gets the time at which Home Assistant loaded the value, which can be later than the time of the reading in the car.
 
